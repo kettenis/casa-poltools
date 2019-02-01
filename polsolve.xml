@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" ?>
+
+<casaxml xmlns="http://casa.nrao.edu/schema/psetTypes.html"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://casa.nrao.edu/schema/casa.xsd
+file:///opt/casa/code/xmlcasa/xml/casa.xsd">
+
+<task type="function" name="polsolve" category="analysis">
+
+  <shortdescription>Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</shortdescription>
+      
+  <description>Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</description>
+
+
+<input>
+
+    <param type="string" name="vis" mustexist="false">
+      <description>Name of input measurement set. The data\nshould already be calibrated \n(in bandpass and gains).</description>
+      <value>input.ms</value>
+    </param>
+
+    <param type="int" name="spw" mustexist="false">
+      <description>Spectral window to fit for.</description>
+      <value>0</value>
+    </param>
+
+    <param type="string" name="field" mustexist="false">
+      <description>Field name (or id) to use as calibrator.</description>
+      <value>0</value>
+    </param>
+
+
+    <param type="any" name="mounts" mustexist="false">
+      <description>List of the antenna mounts (must be given\n in the same order as the ANTENNA table \nof the ms). Use this in case the mounts \nwere not properly imported into the ms.\nA mount type is specified with two characters.\nSupported mounts: \nalt-az (\'AZ\'), \nequatorial (\'EQ\'), \nX-Y (\'XY\'), \nNasmyth Right (\'NR\') and \nNasmyth Left (\'NL\'). \nDefault means all antennas are alt-az.</description>
+      <value>[]</value>
+    </param>
+    
+    <param type="any" name="DR" mustexist="false">
+      <description>List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DR leakage terms to use \n in the fit.</description> 
+      <value>[]</value>
+    </param>
+    
+    <param type="any" name="DL" mustexist="false">
+      <description>List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DL leakage terms to use \n in the fit.</description>
+      <value>[]</value>
+    </param>
+    
+    <param type="any" name="DRSolve" mustexist="false">
+      <description>List of booleans (length equal\nto the number of antennas). If not empty,\n it will tell which DR terms are fitted. \n The DR[i] term will be fitted if \n DRSolve[i] is True. Otherwise, DR[i] \n will be fixed to its a-priori value. \n Default (i.e., empty list) means \n to fit all DRs. </description>
+      <value>[]</value>
+    </param>
+    
+    <param type="any" name="DLSolve" mustexist="false">
+      <description>Just as DRSolve, but for the DL terms.</description>
+      <value>[]</value>
+    </param>
+
+
+    <param type="any" name="CLEAN_models" mustexist="false">
+      <description>List of CLEAN model files (CCs given \n in PRTAB format). Each file will \n correspond to a source component with \n the same polarization state. If one number \n is given (instead of a list of filenames),\n a centered point source (with that \n flux density) will be used.</description>
+      <value>[1.0]</value>
+    </param>
+
+    <param type="any" name="Pfrac" mustexist="false">
+      <description>List of fractional polarizations (one number \n per source component). Pfrac \n values must fall between 0 and 1.</description>
+      <value>[0.0]</value>
+    </param>
+
+    <param type="any" name="EVPA" mustexist="false">
+      <description>List of EVPAs in degrees (one number \n per source component). Angles \n are measured from North to East.</description>
+      <value>[0.0]</value>
+    </param>
+
+
+    <param type="any" name="PolSolve" mustexist="false">
+      <description>List of booleans (one per source component) \n that tell which source components \n are to be fitted in polarization. \n If PolSolve[i] is True, the fractional \n polarization and EVPA of the ith source \n component will be fitted, together with \n the antenna Dterms. If False, all \n Stokes parameters of the ith component will \n be fixed in the fit. \n Empty list means to fit the polarization \n of all the source components.</description>
+      <value>[]</value>
+    </param>
+
+    <param type="boolean" name="parang_corrected" mustexist="false">
+      <description>If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate.</description>
+      <value>True</value>
+    </param>
+
+
+</input>
+
+  <returns type="bool"/>
+
+  <example>
+
+  POLSOLVE EXAMPLES:
+
+  Let's suppose that we have a CLEAN image in AIPS with two CC tables from IMAGR (one per source component).
+  We produce two ascii files (e.g., CC1.dat and CC2.dat) with the output of PRTAB:
+
+  PRTAB(BPRINT=1, EPRINT=0, NDIG = 8, OUTPR = \'PWD:CC1.dat\', DOCRT = -1, INVER = 1, INEXT = \'CC\')
+  PRTAB(BPRINT=1, EPRINT=0, NDIG = 8, OUTPR = \'PWD:CC2.dat\', DOCRT = -1, INVER = 2, INEXT = \'CC\')
+
+  (if polsolve fails using these files, try to remove all unnecessary lines from them, and only keep the 
+  model information).
+
+  Then, if we want to solve for all Dterms and the Stokes parameters of these two components, the keywords 
+  to use would be:
+
+  field = \'Name of Calibrator\'
+  CLEAN_models = [\'CC1.dat\' , \'CC2.dat\']
+  Pfrac = [0., 0.]
+  EVPA = [0., 0.]
+
+  -If there are 8 antennas, and one of them (e.g., the fifth one) has a Nasmyth-Left mount:
+
+  mounts = [\'AZ\' for i in range(8)] ; mounts[4] = \'NL\'
+
+  
+  -If we want to fix (i.e., to NOT fit) the Dterms for L of the first antenna:
+
+  DLSolve = [True for i in range(8)] ; DLSolve[0] = False
+
+  
+  -If we want to fix the fractional polarization of the first component to 10% (with EVPA of 20 deg.):
+
+  Pfrac    = [0.10,   0.0]
+  EVPA     = [  20.,  0.0]
+  PolSolve = [False, True]
+
+
+  After running, the task will create a Dterms table, with the name equal to that of the input
+  measurement set plus the suffix \'.spwI.Dterms\' (where \'I\' is the number of the spectral 
+  window used in the fit).
+
+
+
+</example>
+</task>
+
+</casaxml>
+
+

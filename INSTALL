@@ -1,0 +1,39 @@
+TESTED WITH CASA 5.4
+
+STEPS TO INSTALL THE POLSOLVE AND POLSIMULATE TASKS INTO CASA
+
+
+
+0.- Untar this file into a directory of your choice 
+    (e.g., $HOME/.casa/PolTools)
+
+
+1.- If it exists, delete any file with the *.so extension.
+
+    
+2.- Compile the C++ modules. In a terminal, run:
+
+    python setup.py build_ext --inplace
+
+
+3.- Run "buildmytasks" in that directory:
+
+    $CASACORE/bin/buildmytasks
+
+    
+4.- Edit the file $HOME/.casa/init.py
+    Add the lines:
+    
+       import sys
+       sys.path.append('/YOUR_HOME_DIRECTORY_FULLPATH/.casa/PolTools')
+       execfile('/YOUR_HOME_DIRECTORY_FULLPATH/.casa/PolTools/mytasks.py')
+
+       
+5.- That's it! You should be able to run the new tasks in CASA!
+    Just doing:
+ 
+         task polsolve   or   tget polsolve
+         task polsimulate   or   tget polsimulate
+
+
+    should load the tasks.
