@@ -52,14 +52,21 @@
 #        2nd order corrections (slower).
 #        Parangle for orbital elements is not implemented.
 
-# TODO: Combine IFs and parameterize frequency dependence.
-#       Work directly on FITS-IDI (or uvfits) files.
-#       Write a more complete documentation.
-#       Solve for RM.
-#       Apply the calibration into the corrected column.
+# TODO: 
+#       1. Combine IFs and parameterize frequency dependence.
+#
+#       2. Work directly on FITS-IDI (or uvfits) files.
+#
+#       3. Write a more complete documentation.
+#
+#       4. Solve for RM.
+#
+#       5. Apply the calibration into the corrected column.   DONE!
 #       (to overcome mounts limitations in CASA).
-#       Multi-source self-consistent fitting.
-
+#
+#       6. Multi-source self-consistent fitting.
+#
+#
 
 import gc
 import os
@@ -79,48 +86,22 @@ __version__ = '1.0'
 #####################
 # UNIT TEST LINES:
 if __name__=='__main__':
-#
-#  vis = 'VLBA_TEST3_1DT'
-#  vis = '/home/marti/WORKAREA/EHT/TEST3_VLBI/TEST3_VLBI_EXTENDED'
-#  spw = 0
-#  field = '0'
-#  mounts = []
-#  DR = [0.0 + 0.0*1.j for i in range(10)]
-#  DL = []
-#  DRSolve = [True for i in range(10)] ; DRSolve[4] = False
-#  DLSolve = [True for i in range(10)] ; DLSolve[4] = False
-
-#  CLEAN_models = ['./TEST3_VLBI/COMP1.CC','./TEST3_VLBI/COMP2.CC']
-#  Pfrac = [0.0,0.0]
-#  EVPA = [0.0,0.0]
-#  PolSolve = [True,True]
-
-  DATANAME = 'TEST3_VLBI_EXTENDED'
-  DRS = [True for i in range(10)]; DRS[4] = False
-  DLS = [True for i in range(10)]; DLS[4] = False
-
-#  polsolve(
-  vis=DATANAME 
-  spw = 0 
-  field = '0'
-  mounts = []
-  DRSolve = DRS
-  DLSolve = DLS
-  CLEAN_models = ['COMP1.CC','COMP2.CC']
-  Pfrac = [0.0,0.0]
-  EVPA = [0.0,0.0]
-  PolSolve = [True,True]
-  parang_corrected = False
-
-
-
-#  CLEAN_models = ['./TEST3_VLBI/COMP1.CC']
-#  Pfrac = [0.0]
-#  EVPA = [0.0]
-#  PolSolve = [True]
-
-
-  parang_corrected = False
+    
+  vis                =  "3C279_POLSIM_3597.ms"
+  vis = 'TOTOMS.ms'
+  spw                =  0
+  field              =  "0"
+  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'AZ', 'NL']
+  DR                 =  []
+  DL                 =  []
+  DRSolve            =  []
+  DLSolve            =  []
+  CLEAN_models       =  [1.0]
+  Pfrac              =  [0.0]
+  EVPA               =  [0.0]
+  PolSolve           =  [True]
+  parang_corrected    =  True
+  target_field       =  ""
 #
 #
 #
@@ -133,7 +114,7 @@ if __name__=='__main__':
 
 def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = [],
                 DRSolve = [], DLSolve = [], CLEAN_models = [1.0], Pfrac = [0.0], 
-                EVPA = [0.0], PolSolve = [True], parang_corrected = True):
+                EVPA = [0.0], PolSolve = [True], parang_corrected = True, target_field = ''):
 
 
 
@@ -144,7 +125,19 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 ########
 
 
+
+
+
+
+
+
+###########################################
+# HELPER FUNCTIONS
+###########################################
+
+
 # Helper functions to print info/errors in terminal + logger:
+
   def printError(msg):
     print '\n', msg, '\n'
     casalog.post('PolSolve: '+msg)
@@ -154,6 +147,252 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     print msg
     if dolog:
       casalog.post('PolSolve: '+msg)
+
+
+
+
+
+# Helper function (return list of target fields, given in CASA format):
+
+  def getFields(vis,field_str):
+    """ Takes a string of field range selection and returns a list 
+    with the field ids. Examples of strings:
+    
+    '0~3'
+    '0,1,2,3~5'
+    'M87,3C279'
+    """
+      
+    tb.open(os.path.join(vis,'FIELD'))  
+    NAMES = list(tb.getcol('NAME'))
+    
+    # Remove annoying spaces:
+    fields = field_str.replace(' ','')
+    
+    # Field entries separated by commas:
+    selFields = []
+    for fld in fields.split(','):
+      if '~' in fld: # Field range (must be integers)
+        try:  
+          f0,f1 = map(int,fld.split('~'))  
+        except:
+          printError('WRONG FORMAT FOR TARGET FIELDS!')
+        if f0<0 or f1>len(NAMES): # Field ids must exist!
+          printError('WRONG RANGE OF TARGET FIELDS!')  
+        selFields += range(f0,f1+1)
+      elif fld in NAMES: # Field name is given.
+        selFields += [NAMES.index(fld)]
+      else: # Field id is given (must be an integer).
+        try:
+          selFields += [int(fld)]
+        except:
+          printError('WRONG FIELD %s!'%fld)
+          
+    return selFields
+
+
+
+
+
+
+
+
+
+
+
+# Helper function to compute feed (i.e., mount + parallactic) angles:
+
+  def getParangle(vis,spw,field,mounts, scan = -1):
+      
+    """ Returns feed rotation (mount + parangle) for the visibilities
+    corresponding to field (id) or to the scan number (if >= 0). """
+      
+      
+    tb.open(os.path.join(vis,'FIELD'))
+    scoord = tb.getcol('PHASE_DIR')
+    tb.close()      
+
+# NOTE: Revise this for multi-source measurement sets!!
+    RA = scoord[0,0,field]
+    Dec = scoord[1,0,field]
+
+    CosDec = np.cos(Dec)
+    SinDec = np.sin(Dec)
+    
+# Load antenna info:
+    tb.open(os.path.join(vis,'ANTENNA'))
+    apos = tb.getcol('POSITION')
+    nant = len(apos)
+    tb.close()
+
+    Lat = np.arctan2(apos[2,:],np.sqrt(apos[0,:]**2. + apos[1,:]**2.))
+    Tlat = np.tan(Lat)
+    Lon = np.arctan2(apos[1,:],apos[0,:])
+
+
+# Load data:
+    ms.open(vis)
+    ms.selectinit(datadescid=spw)
+    if scan < 0:
+      ms.select({'field_id':field})
+    else:
+      ms.select({'scan_number':scan})
+      
+    DATA = ms.getdata(['u','v','w','antenna1','antenna2'])
+    Nvis  = len(DATA['u'])
+    
+    ms.close()
+
+# Compute PAs using UV coordinates:
+
+    PAs = np.zeros((Nvis,2))
+    
+    V2 = SinDec*DATA['v'] - CosDec*DATA['w']
+    
+    Bx = -(apos[0,DATA['antenna2']]-apos[0,DATA['antenna1']])
+    By = -(apos[1,DATA['antenna2']]-apos[1,DATA['antenna1']])
+    Bz = -(apos[2,DATA['antenna2']]-apos[2,DATA['antenna1']])
+
+    CH = DATA['u']*By - V2*Bx
+    SH = DATA['u']*Bx + V2*By
+    
+    CT1 = CosDec*Tlat[DATA['antenna1']]
+    CT2 = CosDec*Tlat[DATA['antenna2']]
+    
+    HAng = np.arctan2(SH,CH)
+   
+    H1 = HAng + Lon[DATA['antenna1']]
+    H2 = HAng + Lon[DATA['antenna2']]
+    
+    
+    Autos = (CH==0.)*(SH==0.)
+    H1[Autos] = 0.0
+    H2[Autos] = 0.0
+    
+    E1 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna1']])+np.cos(Lat[DATA['antenna1']])*CosDec*np.cos(H1))
+    E2 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna2']])+np.cos(Lat[DATA['antenna2']])*CosDec*np.cos(H2))
+
+    PAZ1 = np.arctan2(np.sin(H1), CT1 - SinDec*np.cos(H1))
+    PAZ2 = np.arctan2(np.sin(H2), CT2 - SinDec*np.cos(H2))
+
+
+# Add mount rotations:
+
+    for mti,mt in enumerate(mounts):
+      filt = DATA['antenna1'] == mti 
+      if mt=='AZ':
+        PAs[filt,0] = -PAZ1[filt]
+      elif mt=='EQ':
+        PAs[filt,0] = 0.0
+      elif mt=='XY':
+        PAs[filt,0] = -np.arctan2(np.cos(H1[filt]),SinDec*np.sin(H1[filt]))
+      elif mt=='NR':
+        PAs[filt,0] = -PAZ1[filt] - E1[filt]
+      elif mt=='NL':
+        PAs[filt,0] = -PAZ1[filt] + E1[filt]
+
+      filt = DATA['antenna2'] == mti 
+      if mt=='AZ':
+        PAs[filt,1] = -PAZ2[filt]
+      elif mt=='EQ':
+        PAs[filt,1] = 0.0
+      elif mt=='XY':
+        PAs[filt,1] = -np.arctan2(np.cos(H2[filt]),SinDec*np.sin(H2[filt]))
+      elif mt=='NR':
+        PAs[filt,1] = -PAZ2[filt] - E2[filt]
+      elif mt=='NL':
+        PAs[filt,1] = -PAZ2[filt] + E2[filt]
+
+# Release memory:
+    del DATA['antenna1'], DATA['antenna2'], DATA['u'], DATA['v'], DATA['w']
+    del H1, H2, E1, E2, PAZ1, PAZ2, Bx, By, Bz, CH, SH, CT1, CT2, V2, filt
+
+# Finished!
+    return PAs
+
+
+
+
+
+
+# Helper function to print matrices nicely:
+  def printMatrix(a,f="% 6.3f"):
+    print "Matrix["+("%d" %a.shape[0])+"]["+("%d" %a.shape[1])+"]"
+    rows = a.shape[0]
+    cols = a.shape[1]
+    for i in range(0,rows):
+      for j in range(0,cols):
+         print(f%a[i,j]),
+      print
+    print   
+
+
+
+# Helper function that fills the vector of variables,
+# given the vector of fitting parameters:
+  def setFitVal(p,NmodComp, nant, FITSOU, DRSolve, DLSolve):
+    """ Fills vector of variables given the fitting parameters.
+    First, Stokes Q and U for all fittable components. 
+    Then, the fittable DR and DL (in real/imag base). 
+    
+    Fittable source components are given by the list of booleans FITSOU.
+    Fittable Dterms are given by the lists of booleans DRSolve and DLSolve.
+    NmodComp and nant is the total number (i.e., fixed and fittable) of 
+    source components and antennas, respectively.
+    """
+
+    i = 0
+    for si in range(NmodComp):
+      if FITSOU[si]:
+        FitVal[2*si  ]  = p[i] 
+        FitVal[2*si+1]  = p[i+1] 
+        i += 2
+    for ni in range(nant):
+      if DRSolve[ni]:
+        FitVal[2*NmodComp+2*ni  ]  = p[i]
+        FitVal[2*NmodComp+2*ni+1]  = p[i+1]
+        i += 2
+    for ni in range(nant):
+      if DLSolve[ni]:
+        FitVal[2*(NmodComp+nant)+2*ni  ]  = p[i]
+        FitVal[2*(NmodComp+nant)+2*ni+1]  = p[i+1]
+        i += 2
+
+
+# Computes the Chi2, given a set of fitting parameter values (p)
+# and also computes the Hessian and the residuals vector:
+  def getChi2(p, NmodComp, nant, FITSOU, DRSolve, DLSolve, arg=0):
+    """ Returns either the Chi square and Hessian (+ residuals) or
+    the optimum model flux scaling, depending on the value of \"arg\" 
+    (see documentation of C++ module). Same arguments as setFitVal."""
+    
+    setFitVal(p,NmodComp,nant, FITSOU, DRSolve, DLSolve)
+    return PS.getHessian(0.0)[arg]
+
+
+
+
+
+
+
+
+
+###########################################
+# END OF HELPER FUNCTIONS
+###########################################
+
+
+
+
+
+
+
+
+
+
+
+
+# SCRIPT STARTS!
 
 
   printMsg( '\n\n  POLSOLVE - VERSION %s  - I. Marti-Vidal (Yebes Observatory, Spain)'%__version__)
@@ -232,7 +471,6 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 # Load info about calibrator:
   tb.open(os.path.join(vis,'FIELD'))
   snam = list(tb.getcol('NAME'))
-  scoord = tb.getcol('PHASE_DIR')
   tb.close()
   if field not in snam:
       try:
@@ -242,15 +480,12 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   else:
       fid = snam.index(field)
 
-# NOTE: Revise this for multi-source measurement sets!!
-  RA = scoord[0,0,fid]
-  Dec = scoord[1,0,fid]
+
 
 
 # Load antenna info:
   tb.open(os.path.join(vis,'ANTENNA'))
   anam = list(tb.getcol('NAME'))
-  apos = tb.getcol('POSITION')
   nant = len(anam)
   tb.close()
 
@@ -320,7 +555,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
-# Print info for checking:
+# Print info for sanity checking:
   printMsg('\nThere are %i antennas'%nant)
   F = {True: 'FITTABLE',False: 'FIXED   '}
   for ai in range(nant):
@@ -333,7 +568,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   spwFreqs = ms.range('chan_freq')['chan_freq'][:,0]
 
 
-# Sanity checks:
+# More sanity checks:
   for pi in polprods: # By now, only circular feeds are allowed.
     if pi not in ['RR','RL','LR','LL']:
       printError("ERROR! Wrong pol. product %s"%pi)
@@ -380,80 +615,18 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
   printMsg('\nComputing parallactic angles')
 
-  CosDec = np.cos(Dec)
-  SinDec = np.sin(Dec)
-
-  Lat = np.arctan2(apos[2,:],np.sqrt(apos[0,:]**2. + apos[1,:]**2.))
-  Tlat = np.tan(Lat)
-  Lon = np.arctan2(apos[1,:],apos[0,:])
-
-
-  PAs = np.zeros((Nvis,2))
-    
-  V2 = SinDec*DATA['v'] - CosDec*DATA['w']
-    
-  Bx = -(apos[0,DATA['antenna2']]-apos[0,DATA['antenna1']])
-  By = -(apos[1,DATA['antenna2']]-apos[1,DATA['antenna1']])
-  Bz = -(apos[2,DATA['antenna2']]-apos[2,DATA['antenna1']])
-
-  CH = DATA['u']*By - V2*Bx
-  SH = DATA['u']*Bx + V2*By
-    
-  CT1 = CosDec*Tlat[DATA['antenna1']]
-  CT2 = CosDec*Tlat[DATA['antenna2']]
-    
-  HAng = np.arctan2(SH,CH)
-   
-  H1 = HAng + Lon[DATA['antenna1']]
-  H2 = HAng + Lon[DATA['antenna2']]
-    
-    
-  Autos = (CH==0.)*(SH==0.)
-  H1[Autos] = 0.0
-  H2[Autos] = 0.0
-    
-  E1 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna1']])+np.cos(Lat[DATA['antenna1']])*CosDec*np.cos(H1))
-  E2 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna2']])+np.cos(Lat[DATA['antenna2']])*CosDec*np.cos(H2))
-
-  PAZ1 = np.arctan2(np.sin(H1), CT1 - SinDec*np.cos(H1))
-  PAZ2 = np.arctan2(np.sin(H2), CT2 - SinDec*np.cos(H2))
-
-
-
-  for mti,mt in enumerate(mounts):
-    filt = DATA['antenna1'] == mti 
-    if mt=='AZ':
-      PAs[filt,0] = -PAZ1[filt]
-    elif mt=='EQ':
-      PAs[filt,0] = 0.0
-    elif mt=='XY':
-      PAs[filt,0] = -np.arctan2(np.cos(H1[filt]),SinDec*np.sin(H1[filt]))
-    elif mt=='NR':
-      PAs[filt,0] = -PAZ1[filt] - E1[filt]
-    elif mt=='NL':
-      PAs[filt,0] = -PAZ1[filt] + E1[filt]
-
-    filt = DATA['antenna2'] == mti 
-    if mt=='AZ':
-      PAs[filt,1] = -PAZ2[filt]
-    elif mt=='EQ':
-      PAs[filt,1] = 0.0
-    elif mt=='XY':
-      PAs[filt,1] = -np.arctan2(np.cos(H2[filt]),SinDec*np.sin(H2[filt]))
-    elif mt=='NR':
-      PAs[filt,1] = -PAZ2[filt] - E2[filt]
-    elif mt=='NL':
-      PAs[filt,1] = -PAZ2[filt] + E2[filt]
-
+  PAs = getParangle(vis,spw,fid,mounts)
 
 #######################################
 
+  gc.collect()
+  
 
 # Sum and difference of PANGS (in complex form):
   EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
 
 
-# Get data back into antenna frame:
+# Get data back into antenna frame (if it was in the sky frame):
   if parang_corrected:
     printMsg("Undoing parang correction")
     DATAPol[:,:,0] *= EMA[:,np.newaxis]
@@ -480,11 +653,18 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
     COMPS[:,:,NmodComp] += COMPS[:,:,i]
 
-  DSUM = 0.5*np.sum(np.abs(np.average(DATAPol[:,:,0]/EMA[:,np.newaxis] + DATAPol[:,:,1]*EMA[:,np.newaxis],axis=1)))
-  MSUM = np.sum(np.abs(np.average(COMPS[:,:,NmodComp],axis=1)))
+# How much flux do we have in the DATA?
+  DSUM = 0.5*np.sum(np.abs(np.average(Wgt*(DATAPol[:,:,0]/EMA[:,np.newaxis] + DATAPol[:,:,1]*EMA[:,np.newaxis]),axis=1)))/(np.sum(np.average(Wgt,axis=1)))
+
+#  print np.max(Wgt), DSUM
+
+# How much flux do we have in the MODEL?
+  MSUM = np.sum(np.abs(np.average(Wgt*COMPS[:,:,NmodComp],axis=1)))/(np.sum(np.average(Wgt,axis=1)))
   
+#  print np.max(Wgt), MSUM
+  
+# Notice that the Chi2 will take out the effects of this FluxFactor!  
   FluxFactor = MSUM/DSUM
-  
   printMsg('All model components describe up to %.2f percent of the signal\n'%(FluxFactor*100.))
   
   
@@ -567,50 +747,11 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   if success != 0:
     printError('ERROR READING DATA INTO C++: CODE %i'%success)
 
-# Help function to print matrices:
-  def printMatrix(a,f="%6.3f"):
-    print "Matrix["+("%d" %a.shape[0])+"]["+("%d" %a.shape[1])+"]"
-    rows = a.shape[0]
-    cols = a.shape[1]
-    for i in range(0,rows):
-      for j in range(0,cols):
-         print(f%a[i,j]),
-      print
-    print   
-
-
-
-# Helper function that fills the vector of variables,
-# given the vector of fitting parameters:
-  def setFitVal(p):
-    i = 0
-    for si in range(NmodComp):
-      if FITSOU[si]:
-        FitVal[2*si  ]  = p[i] 
-        FitVal[2*si+1]  = p[i+1] 
-        i += 2
-    for ni in range(nant):
-      if DRSolve[ni]:
-        FitVal[2*NmodComp+2*ni  ]  = p[i]
-        FitVal[2*NmodComp+2*ni+1]  = p[i+1]
-        i += 2
-    for ni in range(nant):
-      if DLSolve[ni]:
-        FitVal[2*(NmodComp+nant)+2*ni  ]  = p[i]
-        FitVal[2*(NmodComp+nant)+2*ni+1]  = p[i+1]
-        i += 2
-
-
-# Computes the Chi2, given a set of fitting parameter values (p)
-# and also computes the Hessian and the residuals vector:
-  def getChi2(p,arg=0):
-    setFitVal(p)
-    return PS.getHessian(0.0)[arg]
 
 
 # Just code for testing (turned off):
   if False:
-    myfit = minimize(getChi2,[0. for i in range(Npar)], method='nelder-mead')
+    myfit = minimize(getChi2,[0. for i in range(Npar)], args= (NmodComp, nant, FITSOU, DRSolve, DLSolve), method='nelder-mead')
     iff = open('polsolve.dterms','w')
     import pickle as pk
     pk.dump(myfit,iff)
@@ -619,10 +760,21 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
+
+
+
+
+
+##################################
+################################################
+##############################################################
+####################################################################
 # Levenberg-Marquardt in-house implementation:
+
+
   def LMFit(pini):
 
-    NITER = 10*Npar; Lambda = 1.e-6; kfac = 5.0; functol = 1.e-9
+    NITER = 3*Npar; Lambda = 1.e-6; kfac = 5.0; functol = 1.e-9
 
 
 # For testing:
@@ -643,7 +795,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     Hessian[:,:] = 0.0
     ResVec[:] = 0.0
 
-    CurrChi = getChi2(pini)
+    CurrChi = getChi2(pini, NmodComp, nant, FITSOU, DRSolve, DLSolve)
     backupHess[:,:] = Hessian
     backupGrad[:] = ResVec
 
@@ -671,7 +823,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
       if goodsol:
         Hessian[:,:] = 0.0
         ResVec[:] = 0.0
-        Chi2 = getChi2(p)
+        Chi2 = getChi2(p, NmodComp, nant, FITSOU, DRSolve, DLSolve)
         RealImpr = Chi2 - CurrChi
       else:
         RealImpr = 1.0
@@ -727,9 +879,19 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
     try:
-      return [p[:], np.linalg.pinv(Hessian), Chi2, getChi2(p,arg=1)]
+      return [p[:], np.linalg.pinv(Hessian), Chi2, getChi2(p, NmodComp, nant, FITSOU, DRSolve, DLSolve, arg=1)]
     except:
       return False
+
+
+####################################################################
+##############################################################
+################################################
+##################################
+
+
+
+
 
 
 
@@ -873,9 +1035,87 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
+
+
+  targets = str(target_field)
+  if len(targets)>0:
+    selFields = getFields(vis,targets)
+    if not parang_corrected:
+      printError('IN THE CURRENT VERSION, DTERMS ARE ONLY APPLIED IF parang_corrected is True!')
+  else:
+    selFields = []
+  
+  
+  DRa = -np.array(DR)
+  DLa = -np.array(DL)
+  SFac = np.abs(1./(1.-DRa*DLa))    
+      
+  for target in selFields:
+    printMsg('\nApplying calibration to field id %i'%target)  
+    ms.open(vis)
+    ms.selectinit(datadescid=int(spw))
+    scans = ms.range('scan_number')['scan_number']
+    ms.close()
+    for sci in scans:
+      sys.stdout.write('\r  SCAN %i'%sci)
+      sys.stdout.flush()
+      
+      PAs = getParangle(vis,spw,target,mounts, scan=sci)
+        
+      ms.open(vis,nomodify=False)
+      ms.selectinit(datadescid=spw)
+      ms.select({'scan_number':sci})
+      try:
+        DATA = ms.getdata(['corrected_data'])
+        ANTD = ms.getdata(['antenna1','antenna2'])
+      except:
+        ms.close()
+        printError('COULD NOT READ CORRECTED DATA! DID YOU RUN CLEARCAL??')
+        
+
+
+# Sum and difference of PANGS (in complex form):
+    EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
+
+
+# Get data back into antenna frame:
+    if parang_corrected:
+      DATA['corrected_data'][polprods.index('RR'),:,:] *= EMA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('RL'),:,:] *= EPA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('LR'),:,:] /= EPA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('LL'),:,:] /= EMA[np.newaxis,:]
+
+# Apply Dterms:
+    SDt = SFac[ANTD['antenna1']]*np.conjugate(SFac[ANTD['antenna2']])
+    BKP_RR = np.copy(DATA['corrected_data'][polprods.index('RR'),:,:])*SDt
+    BKP_RL = np.copy(DATA['corrected_data'][polprods.index('RL'),:,:])*SDt
+    BKP_LR = np.copy(DATA['corrected_data'][polprods.index('LR'),:,:])*SDt
+    BKP_LL = np.copy(DATA['corrected_data'][polprods.index('LL'),:,:])*SDt
+
+    DATA['corrected_data'][polprods.index('RR'),:,:] = BKP_RR + np.conjugate(DRa[ANTD['antenna2']])*BKP_RL + DRa[ANTD['antenna1']]*BKP_LR + DRa[ANTD['antenna1']]*np.conjugate(DRa[ANTD['antenna2']])*BKP_LL
+    DATA['corrected_data'][polprods.index('RL'),:,:] = BKP_RL + DRa[ANTD['antenna1']]*np.conjugate(DLa[ANTD['antenna2']])*BKP_LR + DRa[ANTD['antenna1']]*BKP_LL + np.conjugate(DLa[ANTD['antenna2']])*BKP_RR
+    DATA['corrected_data'][polprods.index('LR'),:,:] = BKP_LR + DLa[ANTD['antenna1']]*np.conjugate(DRa[ANTD['antenna2']])*BKP_RL + DLa[ANTD['antenna1']]*BKP_RR + np.conjugate(DRa[ANTD['antenna2']])*BKP_LL
+    DATA['corrected_data'][polprods.index('LL'),:,:] = BKP_LL + np.conjugate(DLa[ANTD['antenna2']])*BKP_LR + DLa[ANTD['antenna1']]*BKP_RL + DLa[ANTD['antenna1']]*np.conjugate(DLa[ANTD['antenna2']])*BKP_RR
+
+# Put data into sky frame:
+    DATA['corrected_data'][polprods.index('RR'),:,:] /= EMA[np.newaxis,:]
+    DATA['corrected_data'][polprods.index('RL'),:,:] /= EPA[np.newaxis,:]
+    DATA['corrected_data'][polprods.index('LR'),:,:] *= EPA[np.newaxis,:]
+    DATA['corrected_data'][polprods.index('LL'),:,:] *= EMA[np.newaxis,:]
+
+# Save data:
+    ms.putdata(DATA)
+    ms.close()
+   
+
+# Release memory:
+    del BKP_RR, BKP_LL, BKP_RL, BKP_LR, DATA['corrected_data'], ANTD['antenna1'], ANTD['antenna2'], SDt
+    gc.collect()
+    
+
 if __name__=='__main__':
 
   polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, 
-           CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected)
+           CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected,target_field)
 
 

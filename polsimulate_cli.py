@@ -27,7 +27,7 @@ class polsimulate_cli_:
        self.__bases__ = (polsimulate_cli_,)
        self.__doc__ = self.__call__.__doc__
 
-       self.parameters={'vis':None, 'array_configuration':None, 'feed':None, 'mounts':None, 'ConstDt0':None, 'ConstDt1':None, 'LO':None, 'BBs':None, 'spw_width':None, 'nchan':None, 'model_image':None, 'I':None, 'Q':None, 'U':None, 'V':None, 'RM':None, 'spec_index':None, 'RAoffset':None, 'Decoffset':None, 'spectrum_file':None, 'incenter':None, 'incell':None, 'inbright':None, 'inwidth':None, 'H0':None, 'onsource_time':None, 'observe_time':None, 'visib_time':None, 'nscan':None, 'apply_parang':None, 'export_uvf':None, 'corrupt':None, 'seed':None, 'Dt_amp':None, 'Dt_noise':None, 'tau0':None, 't_sky':None, 't_ground':None, 't_receiver':None, }
+       self.parameters={'vis':None, 'reuse':None, 'array_configuration':None, 'elevation_cutoff':None, 'feed':None, 'mounts':None, 'ConstDt0':None, 'ConstDt1':None, 'LO':None, 'BBs':None, 'spw_width':None, 'nchan':None, 'model_image':None, 'I':None, 'Q':None, 'U':None, 'V':None, 'RM':None, 'spec_index':None, 'RAoffset':None, 'Decoffset':None, 'spectrum_file':None, 'phase_center':None, 'incell':None, 'inbright':None, 'inwidth':None, 'innu0':None, 'H0':None, 'onsource_time':None, 'observe_time':None, 'visib_time':None, 'nscan':None, 'apply_parang':None, 'export_uvf':None, 'corrupt':None, 'seed':None, 'Dt_amp':None, 'Dt_noise':None, 'tau0':None, 't_sky':None, 't_ground':None, 't_receiver':None, }
 
 
     def result(self, key=None):
@@ -35,7 +35,7 @@ class polsimulate_cli_:
 	    return None
 
 
-    def __call__(self, vis=None, array_configuration=None, feed=None, mounts=None, ConstDt0=None, ConstDt1=None, LO=None, BBs=None, spw_width=None, nchan=None, model_image=None, I=None, Q=None, U=None, V=None, RM=None, spec_index=None, RAoffset=None, Decoffset=None, spectrum_file=None, incenter=None, incell=None, inbright=None, inwidth=None, H0=None, onsource_time=None, observe_time=None, visib_time=None, nscan=None, apply_parang=None, export_uvf=None, corrupt=None, seed=None, Dt_amp=None, Dt_noise=None, tau0=None, t_sky=None, t_ground=None, t_receiver=None, ):
+    def __call__(self, vis=None, reuse=None, array_configuration=None, elevation_cutoff=None, feed=None, mounts=None, ConstDt0=None, ConstDt1=None, LO=None, BBs=None, spw_width=None, nchan=None, model_image=None, I=None, Q=None, U=None, V=None, RM=None, spec_index=None, RAoffset=None, Decoffset=None, spectrum_file=None, phase_center=None, incell=None, inbright=None, inwidth=None, innu0=None, H0=None, onsource_time=None, observe_time=None, visib_time=None, nscan=None, apply_parang=None, export_uvf=None, corrupt=None, seed=None, Dt_amp=None, Dt_noise=None, tau0=None, t_sky=None, t_ground=None, t_receiver=None, ):
 
         """Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization observations. The output should be imaged with CLEAN (with stokes=IQUV) and the polarization vectors should be computed with immath (with options poli and pola). See the ALMA Polarization CASA Guide for more information.\n\n
 
@@ -45,8 +45,14 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
 		vis:	Name of output measurement set.
 		   Default Value: polsimulate_output.ms
 
+		reuse:	If True, and the measurement set exists, will reuse it (so the antenna names and source coordinates will be reused as well).
+		   Default Value: False
+
 		array_configuration:	Array configuration file, where the antenna coordinates and diameters are set (see the files in data/alma/simmos of your CASA path). Default is an ALMA configuration. The name of the array is taken as the part of the name of this file before the first dot (i.e., it is \'alma\' for the default filename).
 		   Default Value: alma.out04.cfg
+
+		elevation_cutoff:	Minimum allowed elevation for the antennas (degrees).
+		   Default Value: 5.0
 
 		feed:	Polarization basis for the measurement set. Can be linear (e.g., for ALMA) or circular (e.g., for VLA). Default is linear.
 		   Default Value: linear
@@ -102,16 +108,19 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
 		spectrum_file:	File with user-defined spectra of I, Q, U, and V. See help for details about the file format. This source WILL BE ADDED TO THE PHASE CENTER, together with the source defined in the model_image model and all those given in the I, Q, U, V, lists.
 		   Default Value: 
 
-		incenter:	Coordinates of the observed source (will override the coordinates defined in model_image, if an image is being used). This keyword MUST BE defined.
+		phase_center:	Coordinates of the observed source (will override the coordinates defined in model_image, if an image is being used). This keyword MUST BE defined.
 		   Default Value: J2000 00h00m00.00 -00d00m00.00
 
-		incell:	Pixel size of the model_image (will override the original value stored in the image). Default is to use the original image cellsize. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.
+		incell:	Pixel size of the model_image. If not empty, will override the original value stored in the image. Example: \'0.1arcsec\'. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.
 		   Default Value: 
 
-		inbright:	Peak intensity of the model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.
+		inbright:	Peak intensity of the I Stokes model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. Default (i.e., 0.0) means to NOT scale the image birghtness. USE WITH CARE.
+		   Default Value: 0.0
+
+		inwidth:	Width of the frequency channels in the model_image. If not empty, will override the original value stored in the image. Example: \'10MHz\'. All the Stokes images (I, Q, U, and V) will be set the same way.
 		   Default Value: 
 
-		inwidth:	Width of the frequency channels in the model_image (will override the original value stored in the image). Default is to use the original width. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.
+		innu0:	Frequency of the first image channel (e.g., \'1GHz\'). Default (empty) means to use the value in the image.
 		   Default Value: 
 
 		H0:	If a float is given, it is the Hour Angle at the start of the observations, as observed from the array center (in hr). If a string is given, it is the exact start of the observations (UT time) in the format \'2017/01/01/00:00:00\'.
@@ -126,7 +135,7 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
 		visib_time:	Integration time per visibility. This is a string, where \'s\' stands for \'seconds\'.
 		   Default Value: 6s
 
-		nscan:	Number of scans. All scans will be of equal length. \n If an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.
+		nscan:	Number of scans. Can be provided as a \'listobs\' file \n(in that case, observe_time, onsource_time \n and H0 are not used, but taken from the listobs).\n If a list in \'listobs\' format is not provided \nthen all scans will be set to equal length. \n If just an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.
 		   Default Value: 50
 
 		apply_parang:	If True, applies the parallactic-angle correction. \n If False, the data polarization will be given \n in the antenna frame (i.e., just as true raw data).
@@ -242,7 +251,28 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
   spw_width = 512.e6
   nchan = 64
 
-  
+
+  If you want to mimick the exact uv coverage of a real observation
+  (or if you want to have a full control over the observing schedule) 
+  you can set \'nscan\' to the name of an ascii file, expected to have 
+  the time and scan information in \'listobs\' format. 
+  For instance, the contents of that file could be:
+
+  ###################################
+
+  Observed from   11-Apr-2017/01:02:30.0   to   11-Apr-2017/08:45:00.0 (UTC)
+
+  11-Apr-2017/01:02:30.0 - 01:08:30.0     
+              01:38:26.8 - 01:44:00.0    
+              06:51:00.0 - 07:06:00.0    
+
+
+  ###################################
+
+  and so on.
+
+  Notice that, in this case, the values of \'observe_time\', \'onsource_time\' 
+  and \'H0\' will be ignored.
 
 
 
@@ -298,7 +328,9 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
             print ''
 
             myparams['vis'] = vis = self.parameters['vis']
+            myparams['reuse'] = reuse = self.parameters['reuse']
             myparams['array_configuration'] = array_configuration = self.parameters['array_configuration']
+            myparams['elevation_cutoff'] = elevation_cutoff = self.parameters['elevation_cutoff']
             myparams['feed'] = feed = self.parameters['feed']
             myparams['mounts'] = mounts = self.parameters['mounts']
             myparams['ConstDt0'] = ConstDt0 = self.parameters['ConstDt0']
@@ -317,10 +349,11 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
             myparams['RAoffset'] = RAoffset = self.parameters['RAoffset']
             myparams['Decoffset'] = Decoffset = self.parameters['Decoffset']
             myparams['spectrum_file'] = spectrum_file = self.parameters['spectrum_file']
-            myparams['incenter'] = incenter = self.parameters['incenter']
+            myparams['phase_center'] = phase_center = self.parameters['phase_center']
             myparams['incell'] = incell = self.parameters['incell']
             myparams['inbright'] = inbright = self.parameters['inbright']
             myparams['inwidth'] = inwidth = self.parameters['inwidth']
+            myparams['innu0'] = innu0 = self.parameters['innu0']
             myparams['H0'] = H0 = self.parameters['H0']
             myparams['onsource_time'] = onsource_time = self.parameters['onsource_time']
             myparams['observe_time'] = observe_time = self.parameters['observe_time']
@@ -346,7 +379,9 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         mytmp = {}
 
         mytmp['vis'] = vis
+        mytmp['reuse'] = reuse
         mytmp['array_configuration'] = array_configuration
+        mytmp['elevation_cutoff'] = elevation_cutoff
         mytmp['feed'] = feed
         mytmp['mounts'] = mounts
         mytmp['ConstDt0'] = ConstDt0
@@ -365,10 +400,11 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         mytmp['RAoffset'] = RAoffset
         mytmp['Decoffset'] = Decoffset
         mytmp['spectrum_file'] = spectrum_file
-        mytmp['incenter'] = incenter
+        mytmp['phase_center'] = phase_center
         mytmp['incell'] = incell
         mytmp['inbright'] = inbright
         mytmp['inwidth'] = inwidth
+        mytmp['innu0'] = innu0
         mytmp['H0'] = H0
         mytmp['onsource_time'] = onsource_time
         mytmp['observe_time'] = observe_time
@@ -384,7 +420,7 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         mytmp['t_sky'] = t_sky
         mytmp['t_ground'] = t_ground
         mytmp['t_receiver'] = t_receiver
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/PolSim/LaunchPad/"
+	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.casac.utils().torecord(pathname+'polsimulate.xml')
 
         casalog.origin('polsimulate')
@@ -409,7 +445,7 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
               casalog.post(scriptstr[0]+'\n', 'INFO')
           else :
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
-          result = polsimulate(vis, array_configuration, feed, mounts, ConstDt0, ConstDt1, LO, BBs, spw_width, nchan, model_image, I, Q, U, V, RM, spec_index, RAoffset, Decoffset, spectrum_file, incenter, incell, inbright, inwidth, H0, onsource_time, observe_time, visib_time, nscan, apply_parang, export_uvf, corrupt, seed, Dt_amp, Dt_noise, tau0, t_sky, t_ground, t_receiver)
+          result = polsimulate(vis, reuse, array_configuration, elevation_cutoff, feed, mounts, ConstDt0, ConstDt1, LO, BBs, spw_width, nchan, model_image, I, Q, U, V, RM, spec_index, RAoffset, Decoffset, spectrum_file, phase_center, incell, inbright, inwidth, innu0, H0, onsource_time, observe_time, visib_time, nscan, apply_parang, export_uvf, corrupt, seed, Dt_amp, Dt_noise, tau0, t_sky, t_ground, t_receiver)
           if (casa['state']['telemetry-enabled']):
               casalog.poststat('End Task: ' + tname)
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
@@ -464,7 +500,9 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
 
         a = odict()
         a['vis']  = 'polsimulate_output.ms'
+        a['reuse']  = False
         a['array_configuration']  = 'alma.out04.cfg'
+        a['elevation_cutoff']  = 5.0
         a['feed']  = 'linear'
         a['mounts']  = []
         a['ConstDt0']  = []
@@ -483,10 +521,11 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         a['RAoffset']  = []
         a['Decoffset']  = []
         a['spectrum_file']  = ''
-        a['incenter']  = 'J2000 00h00m00.00 -00d00m00.00'
+        a['phase_center']  = 'J2000 00h00m00.00 -00d00m00.00'
         a['incell']  = ''
-        a['inbright']  = ''
+        a['inbright']  = 0.0
         a['inwidth']  = ''
+        a['innu0']  = ''
         a['H0']  = -1.5
         a['onsource_time']  = 1.0
         a['observe_time']  = 3.0
@@ -572,7 +611,9 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
     def description(self, key='polsimulate', subkey=None):
         desc={'polsimulate': 'Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization observations. The output should be imaged with CLEAN (with stokes=IQUV) and the polarization vectors should be computed with immath (with options poli and pola). See the ALMA Polarization CASA Guide for more information.\n\n',
                'vis': 'Name of output measurement set.',
+               'reuse': 'If True, and the measurement set exists, will reuse it (so the antenna names and source coordinates will be reused as well).',
                'array_configuration': 'Array configuration file, where the antenna coordinates and diameters are set (see the files in data/alma/simmos of your CASA path). Default is an ALMA configuration. The name of the array is taken as the part of the name of this file before the first dot (i.e., it is \'alma\' for the default filename).',
+               'elevation_cutoff': 'Minimum allowed elevation for the antennas (degrees).',
                'feed': 'Polarization basis for the measurement set. Can be linear (e.g., for ALMA) or circular (e.g., for VLA). Default is linear.',
                'mounts': 'For VLBI observations, this is a list of the antenna mounts (given in the same order as in the array configuration file). A mount type is specified with two characters. Supported mounts: alt-az (\'AZ\'), equatorial (\'EQ\'), X-Y (\'XY\'), Nasmyth Right (\'NR\') and Nasmyth Left (\'NL\'). Default means all antennas are alt-az.',
                'ConstDt0': 'List of complex numbers (length equal to the number of antennas). If not empty, the first polarizer (i.e., either R or X, depending on the value of \'feed\') will be contamined with a leakage given by these Dterms.',
@@ -591,15 +632,16 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
                'RAoffset': 'List of right-ascension offsets (in arcsec) for the sources defined above. The first source is assumed to be at the phase center, so all sources will be shifted RAoffset[0] arcsec (so that the first source in the list is at the phase center).',
                'Decoffset': 'List of declination offsets (in arcsec) for the sources defined above. The first source is assumed to be at the phase center, so all sources will be shifted Decoffset[0] arcsec.',
                'spectrum_file': 'File with user-defined spectra of I, Q, U, and V. See help for details about the file format. This source WILL BE ADDED TO THE PHASE CENTER, together with the source defined in the model_image model and all those given in the I, Q, U, V, lists.',
-               'incenter': 'Coordinates of the observed source (will override the coordinates defined in model_image, if an image is being used). This keyword MUST BE defined.',
-               'incell': 'Pixel size of the model_image (will override the original value stored in the image). Default is to use the original image cellsize. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.',
-               'inbright': 'Peak intensity of the model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.',
-               'inwidth': 'Width of the frequency channels in the model_image (will override the original value stored in the image). Default is to use the original width. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.',
+               'phase_center': 'Coordinates of the observed source (will override the coordinates defined in model_image, if an image is being used). This keyword MUST BE defined.',
+               'incell': 'Pixel size of the model_image. If not empty, will override the original value stored in the image. Example: \'0.1arcsec\'. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.',
+               'inbright': 'Peak intensity of the I Stokes model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. Default (i.e., 0.0) means to NOT scale the image birghtness. USE WITH CARE.',
+               'inwidth': 'Width of the frequency channels in the model_image. If not empty, will override the original value stored in the image. Example: \'10MHz\'. All the Stokes images (I, Q, U, and V) will be set the same way.',
+               'innu0': 'Frequency of the first image channel (e.g., \'1GHz\'). Default (empty) means to use the value in the image.',
                'H0': 'If a float is given, it is the Hour Angle at the start of the observations, as observed from the array center (in hr). If a string is given, it is the exact start of the observations (UT time) in the format \'2017/01/01/00:00:00\'.',
                'onsource_time': 'Total effective integration time on the source (in hr). Default is 1 hr.',
                'observe_time': 'Total observing time (i.e., including overheads) in hr. Default is 3h, so there will be an observing efficiency of 0.33 if \'onsource_time\' is set to one hour. ',
                'visib_time': 'Integration time per visibility. This is a string, where \'s\' stands for \'seconds\'.',
-               'nscan': 'Number of scans. All scans will be of equal length. \n If an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.',
+               'nscan': 'Number of scans. Can be provided as a \'listobs\' file \n(in that case, observe_time, onsource_time \n and H0 are not used, but taken from the listobs).\n If a list in \'listobs\' format is not provided \nthen all scans will be set to equal length. \n If just an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.',
                'apply_parang': 'If True, applies the parallactic-angle correction. \n If False, the data polarization will be given \n in the antenna frame (i.e., just as true raw data).',
                'export_uvf': 'If True, exports the measurement into uvfits format (for its use in e.g., AIPS/Difmap).',
                'corrupt': 'Whether to add random noise to the visibilities.',
@@ -619,7 +661,9 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
     def itsdefault(self, paramname) :
         a = {}
         a['vis']  = 'polsimulate_output.ms'
+        a['reuse']  = False
         a['array_configuration']  = 'alma.out04.cfg'
+        a['elevation_cutoff']  = 5.0
         a['feed']  = 'linear'
         a['mounts']  = []
         a['ConstDt0']  = []
@@ -638,10 +682,11 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         a['RAoffset']  = []
         a['Decoffset']  = []
         a['spectrum_file']  = ''
-        a['incenter']  = 'J2000 00h00m00.00 -00d00m00.00'
+        a['phase_center']  = 'J2000 00h00m00.00 -00d00m00.00'
         a['incell']  = ''
-        a['inbright']  = ''
+        a['inbright']  = 0.0
         a['inwidth']  = ''
+        a['innu0']  = ''
         a['H0']  = -1.5
         a['onsource_time']  = 1.0
         a['observe_time']  = 3.0

@@ -11,9 +11,11 @@ from taskinit import casalog
 from taskinit import xmlpath
 #from taskmanager import tm
 import task_polsolve
-def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True):
+def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True, target_field=''):
 
-        """Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
+        """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
+
+  TODO: Combine IFs (i.e., spws) and parameterize the frequency dependence of the Dterms!	  
 
   POLSOLVE EXAMPLES:
 
@@ -78,12 +80,13 @@ def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=
         mytmp['EVPA'] = EVPA
         mytmp['PolSolve'] = PolSolve
         mytmp['parang_corrected'] = parang_corrected
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/PolSim/LaunchPad/"
+        mytmp['target_field'] = target_field
+	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.utils().torecord(pathname+'polsolve.xml')
 
         casalog.origin('polsolve')
         if trec.has_key('polsolve') and casac.utils().verify(mytmp, trec['polsolve']) :
-	    result = task_polsolve.polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected)
+	    result = task_polsolve.polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field)
 
 	else :
 	  result = False

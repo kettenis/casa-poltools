@@ -11,7 +11,7 @@ from taskinit import casalog
 from taskinit import xmlpath
 #from taskmanager import tm
 import task_polsimulate
-def polsimulate(vis='polsimulate_output.ms', array_configuration='alma.out04.cfg', feed='linear', mounts=[], ConstDt0=[], ConstDt1=[], LO=100.e9, BBs=[-7.e9, -5.e9, 5.e9, 7.e9], spw_width=2.e9, nchan=8, model_image=[], I=[], Q=[], U=[], V=[], RM=[], spec_index=[], RAoffset=[], Decoffset=[], spectrum_file='', incenter='J2000 00h00m00.00 -00d00m00.00', incell='', inbright='', inwidth='', H0=-1.5, onsource_time=1.0, observe_time=3.0, visib_time='6s', nscan=50, apply_parang=False, export_uvf=True, corrupt=True, seed=42, Dt_amp=0.0, Dt_noise=0.001, tau0=0.0, t_sky=250.0, t_ground=270.0, t_receiver=50.0):
+def polsimulate(vis='polsimulate_output.ms', reuse=False, array_configuration='alma.out04.cfg', elevation_cutoff=5.0, feed='linear', mounts=[], ConstDt0=[], ConstDt1=[], LO=100.e9, BBs=[-7.e9, -5.e9, 5.e9, 7.e9], spw_width=2.e9, nchan=8, model_image=[], I=[], Q=[], U=[], V=[], RM=[], spec_index=[], RAoffset=[], Decoffset=[], spectrum_file='', phase_center='J2000 00h00m00.00 -00d00m00.00', incell='', inbright=0.0, inwidth='', innu0='', H0=-1.5, onsource_time=1.0, observe_time=3.0, visib_time='6s', nscan=50, apply_parang=False, export_uvf=True, corrupt=True, seed=42, Dt_amp=0.0, Dt_noise=0.001, tau0=0.0, t_sky=250.0, t_ground=270.0, t_receiver=50.0):
 
         """Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization observations. The output should be imaged with CLEAN (with stokes=IQUV) and the polarization vectors should be computed with immath (with options poli and pola). See the ALMA Polarization CASA Guide for more information.\n\n
 
@@ -93,7 +93,28 @@ def polsimulate(vis='polsimulate_output.ms', array_configuration='alma.out04.cfg
   spw_width = 512.e6
   nchan = 64
 
-  
+
+  If you want to mimick the exact uv coverage of a real observation
+  (or if you want to have a full control over the observing schedule) 
+  you can set \'nscan\' to the name of an ascii file, expected to have 
+  the time and scan information in \'listobs\' format. 
+  For instance, the contents of that file could be:
+
+  ###################################
+
+  Observed from   11-Apr-2017/01:02:30.0   to   11-Apr-2017/08:45:00.0 (UTC)
+
+  11-Apr-2017/01:02:30.0 - 01:08:30.0     
+              01:38:26.8 - 01:44:00.0    
+              06:51:00.0 - 07:06:00.0    
+
+
+  ###################################
+
+  and so on.
+
+  Notice that, in this case, the values of \'observe_time\', \'onsource_time\' 
+  and \'H0\' will be ignored.
 
 
 
@@ -105,7 +126,9 @@ def polsimulate(vis='polsimulate_output.ms', array_configuration='alma.out04.cfg
         mytmp = {}
 
         mytmp['vis'] = vis
+        mytmp['reuse'] = reuse
         mytmp['array_configuration'] = array_configuration
+        mytmp['elevation_cutoff'] = elevation_cutoff
         mytmp['feed'] = feed
         mytmp['mounts'] = mounts
         mytmp['ConstDt0'] = ConstDt0
@@ -124,10 +147,11 @@ def polsimulate(vis='polsimulate_output.ms', array_configuration='alma.out04.cfg
         mytmp['RAoffset'] = RAoffset
         mytmp['Decoffset'] = Decoffset
         mytmp['spectrum_file'] = spectrum_file
-        mytmp['incenter'] = incenter
+        mytmp['phase_center'] = phase_center
         mytmp['incell'] = incell
         mytmp['inbright'] = inbright
         mytmp['inwidth'] = inwidth
+        mytmp['innu0'] = innu0
         mytmp['H0'] = H0
         mytmp['onsource_time'] = onsource_time
         mytmp['observe_time'] = observe_time
@@ -143,12 +167,12 @@ def polsimulate(vis='polsimulate_output.ms', array_configuration='alma.out04.cfg
         mytmp['t_sky'] = t_sky
         mytmp['t_ground'] = t_ground
         mytmp['t_receiver'] = t_receiver
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/PolSim/LaunchPad/"
+	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.utils().torecord(pathname+'polsimulate.xml')
 
         casalog.origin('polsimulate')
         if trec.has_key('polsimulate') and casac.utils().verify(mytmp, trec['polsimulate']) :
-	    result = task_polsimulate.polsimulate(vis, array_configuration, feed, mounts, ConstDt0, ConstDt1, LO, BBs, spw_width, nchan, model_image, I, Q, U, V, RM, spec_index, RAoffset, Decoffset, spectrum_file, incenter, incell, inbright, inwidth, H0, onsource_time, observe_time, visib_time, nscan, apply_parang, export_uvf, corrupt, seed, Dt_amp, Dt_noise, tau0, t_sky, t_ground, t_receiver)
+	    result = task_polsimulate.polsimulate(vis, reuse, array_configuration, elevation_cutoff, feed, mounts, ConstDt0, ConstDt1, LO, BBs, spw_width, nchan, model_image, I, Q, U, V, RM, spec_index, RAoffset, Decoffset, spectrum_file, phase_center, incell, inbright, inwidth, innu0, H0, onsource_time, observe_time, visib_time, nscan, apply_parang, export_uvf, corrupt, seed, Dt_amp, Dt_noise, tau0, t_sky, t_ground, t_receiver)
 
 	else :
 	  result = False

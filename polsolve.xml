@@ -8,9 +8,9 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
 
 <task type="function" name="polsolve" category="analysis">
 
-  <shortdescription>Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</shortdescription>
+  <shortdescription>Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</shortdescription>
       
-  <description>Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</description>
+  <description>Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n</description>
 
 
 <input>
@@ -79,8 +79,14 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
     </param>
 
     <param type="boolean" name="parang_corrected" mustexist="false">
-      <description>If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate.</description>
+      <description>If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate with no parang correction.</description>
       <value>True</value>
+    </param>
+
+
+    <param type="string" name="target_field" mustexist="false">
+      <description>List of sources to which apply the Dterm (and parangle) correction. It must follow the CASA syntax if a range of field ids is given. Empy list means NOT to apply the Dterms (i.e., just save them in a calibration table). If you want to apply the calibration, DO NOT FORGET TO *ALWAYS* RUN CLEARCAL BEFORE POLSOLVE!!</description>
+      <value></value>
     </param>
 
 
@@ -89,6 +95,8 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
   <returns type="bool"/>
 
   <example>
+
+  TODO: Combine IFs (i.e., spws) and parameterize the frequency dependence of the Dterms!	  
 
   POLSOLVE EXAMPLES:
 

@@ -20,10 +20,23 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
       <value>polsimulate_output.ms</value>
     </param>
 
+    <param type="boolean" name="reuse" mustexist="false">
+      <description>If True, and the measurement set exists, will reuse it (so the antenna names and source coordinates will be reused as well).</description>
+      <value>False</value>
+    </param>
+
+
     <param type="string" name="array_configuration" mustexist="false">
       <description>Array configuration file, where the antenna coordinates and diameters are set (see the files in data/alma/simmos of your CASA path). Default is an ALMA configuration. The name of the array is taken as the part of the name of this file before the first dot (i.e., it is \'alma\' for the default filename).</description>
       <value>alma.out04.cfg</value>
     </param>
+
+
+    <param type="any" name="elevation_cutoff" mustexist="false">
+      <description>Minimum allowed elevation for the antennas (degrees).</description>
+      <value>5.0</value>
+    </param>
+
 
     <param type="string" name="feed" mustexist="false">
       <description>Polarization basis for the measurement set. Can be linear (e.g., for ALMA) or circular (e.g., for VLA). Default is linear.</description>
@@ -120,25 +133,31 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
       <value></value>
     </param>
 
-    <param type="string" name="incenter" mustexist="false">
+    <param type="string" name="phase_center" mustexist="false">
       <description>Coordinates of the observed source (will override the coordinates defined in model_image, if an image is being used). This keyword MUST BE defined.</description>
       <value>J2000 00h00m00.00 -00d00m00.00</value>
     </param>
 
     <param type="string" name="incell" mustexist="false">
-      <description>Pixel size of the model_image (will override the original value stored in the image). Default is to use the original image cellsize. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.</description>
+      <description>Pixel size of the model_image. If not empty, will override the original value stored in the image. Example: \'0.1arcsec\'. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.</description>
       <value></value>
     </param>
 
-    <param type="string" name="inbright" mustexist="false">
-      <description>Peak intensity of the model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.</description>
-      <value></value>
+    <param type="any" name="inbright" mustexist="false">
+      <description>Peak intensity of the I Stokes model_image (will override the original value stored in the image). Default is to use the original brightness unit. All the Stokes images (I, Q, U, and V) will be set the same way. Default (i.e., 0.0) means to NOT scale the image birghtness. USE WITH CARE.</description>
+      <value>0.0</value>
     </param>
 
     <param type="string" name="inwidth" mustexist="false">
-      <description>Width of the frequency channels in the model_image (will override the original value stored in the image). Default is to use the original width. All the Stokes images (I, Q, U, and V) will be set the same way. USE WITH CARE.</description>
+      <description>Width of the frequency channels in the model_image. If not empty, will override the original value stored in the image. Example: \'10MHz\'. All the Stokes images (I, Q, U, and V) will be set the same way.</description>
       <value></value>
     </param>
+
+    <param type="string" name="innu0" mustexist="false">
+      <description>Frequency of the first image channel (e.g., \'1GHz\'). Default (empty) means to use the value in the image.</description>
+      <value></value>
+    </param>
+
 
     <param type="any" name="H0" mustexist="false">
       <description>If a float is given, it is the Hour Angle at the start of the observations, as observed from the array center (in hr). If a string is given, it is the exact start of the observations (UT time) in the format \'2017/01/01/00:00:00\'.</description>
@@ -161,7 +180,7 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
     </param>
 
     <param type="any" name="nscan" mustexist="false">
-      <description>Number of scans. All scans will be of equal length. \n If an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.</description>
+      <description>Number of scans. Can be provided as a \'listobs\' file \n(in that case, observe_time, onsource_time \n and H0 are not used, but taken from the listobs).\n If a list in \'listobs\' format is not provided \nthen all scans will be set to equal length. \n If just an integer is given, the scans will be \n homogeneously distributed across the \n total observing time. If a list is given, \n the values will be taken as the starting times \n of the scans, relative to the \n duration of the experiment. For instance, if \n \'observe_time = 6.0\' then \'nscan = [0., 0.5, 0.75]\' \n will make three scans, one at the start of the \n observations, the second one 3 hours later \n and the third one 4.5 hours after \n the start of the observations.</description>
       <value>50</value>
     </param>
 
@@ -302,7 +321,28 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
   spw_width = 512.e6
   nchan = 64
 
-  
+
+  If you want to mimick the exact uv coverage of a real observation
+  (or if you want to have a full control over the observing schedule) 
+  you can set \'nscan\' to the name of an ascii file, expected to have 
+  the time and scan information in \'listobs\' format. 
+  For instance, the contents of that file could be:
+
+  ###################################
+
+  Observed from   11-Apr-2017/01:02:30.0   to   11-Apr-2017/08:45:00.0 (UTC)
+
+  11-Apr-2017/01:02:30.0 - 01:08:30.0     
+              01:38:26.8 - 01:44:00.0    
+              06:51:00.0 - 07:06:00.0    
+
+
+  ###################################
+
+  and so on.
+
+  Notice that, in this case, the values of \'observe_time\', \'onsource_time\' 
+  and \'H0\' will be ignored.
 
 
 </example>

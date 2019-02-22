@@ -27,7 +27,7 @@ class polsolve_cli_:
        self.__bases__ = (polsolve_cli_,)
        self.__doc__ = self.__call__.__doc__
 
-       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, }
+       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, 'target_field':None, }
 
 
     def result(self, key=None):
@@ -35,12 +35,12 @@ class polsolve_cli_:
 	    return None
 
 
-    def __call__(self, vis=None, spw=None, field=None, mounts=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, ):
+    def __call__(self, vis=None, spw=None, field=None, mounts=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, target_field=None, ):
 
-        """Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
+        """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 
 	Detailed Description:
-Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
+Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 	Arguments :
 		vis:	Name of input measurement set. The data\nshould already be calibrated \n(in bandpass and gains).
 		   Default Value: input.ms
@@ -78,13 +78,18 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
 		PolSolve:	List of booleans (one per source component) \n that tell which source components \n are to be fitted in polarization. \n If PolSolve[i] is True, the fractional \n polarization and EVPA of the ith source \n component will be fitted, together with \n the antenna Dterms. If False, all \n Stokes parameters of the ith component will \n be fixed in the fit. \n Empty list means to fit the polarization \n of all the source components.
 		   Default Value: []
 
-		parang_corrected:	If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate.
+		parang_corrected:	If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate with no parang correction.
 		   Default Value: True
+
+		target_field:	List of sources to which apply the Dterm (and parangle) correction. It must follow the CASA syntax if a range of field ids is given. Empy list means NOT to apply the Dterms (i.e., just save them in a calibration table). If you want to apply the calibration, DO NOT FORGET TO *ALWAYS* RUN CLEARCAL BEFORE POLSOLVE!!
+		   Default Value: 
 
 	Returns: bool
 
 	Example :
 
+
+  TODO: Combine IFs (i.e., spws) and parameterize the frequency dependence of the Dterms!	  
 
   POLSOLVE EXAMPLES:
 
@@ -193,6 +198,7 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
             myparams['EVPA'] = EVPA = self.parameters['EVPA']
             myparams['PolSolve'] = PolSolve = self.parameters['PolSolve']
             myparams['parang_corrected'] = parang_corrected = self.parameters['parang_corrected']
+            myparams['target_field'] = target_field = self.parameters['target_field']
 
 
 	result = None
@@ -215,7 +221,8 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
         mytmp['EVPA'] = EVPA
         mytmp['PolSolve'] = PolSolve
         mytmp['parang_corrected'] = parang_corrected
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/PolSim/LaunchPad/"
+        mytmp['target_field'] = target_field
+	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.casac.utils().torecord(pathname+'polsolve.xml')
 
         casalog.origin('polsolve')
@@ -240,7 +247,7 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
               casalog.post(scriptstr[0]+'\n', 'INFO')
           else :
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
-          result = polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected)
+          result = polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field)
           if (casa['state']['telemetry-enabled']):
               casalog.poststat('End Task: ' + tname)
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
@@ -307,6 +314,7 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
         a['EVPA']  = [0.0]
         a['PolSolve']  = []
         a['parang_corrected']  = True
+        a['target_field']  = ''
 
 
 ### This function sets the default values but also will return the list of
@@ -375,7 +383,7 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
 #
 #
     def description(self, key='polsolve', subkey=None):
-        desc={'polsolve': 'Version 1.0 - Leakage solver for circular polarizers and extended polarization calibrators.\n\n',
+        desc={'polsolve': 'Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n',
                'vis': 'Name of input measurement set. The data\nshould already be calibrated \n(in bandpass and gains).',
                'spw': 'Spectral window to fit for.',
                'field': 'Field name (or id) to use as calibrator.',
@@ -388,7 +396,8 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
                'Pfrac': 'List of fractional polarizations (one number \n per source component). Pfrac \n values must fall between 0 and 1.',
                'EVPA': 'List of EVPAs in degrees (one number \n per source component). Angles \n are measured from North to East.',
                'PolSolve': 'List of booleans (one per source component) \n that tell which source components \n are to be fitted in polarization. \n If PolSolve[i] is True, the fractional \n polarization and EVPA of the ith source \n component will be fitted, together with \n the antenna Dterms. If False, all \n Stokes parameters of the ith component will \n be fixed in the fit. \n Empty list means to fit the polarization \n of all the source components.',
-               'parang_corrected': 'If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate.',
+               'parang_corrected': 'If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate with no parang correction.',
+               'target_field': 'List of sources to which apply the Dterm (and parangle) correction. It must follow the CASA syntax if a range of field ids is given. Empy list means NOT to apply the Dterms (i.e., just save them in a calibration table). If you want to apply the calibration, DO NOT FORGET TO *ALWAYS* RUN CLEARCAL BEFORE POLSOLVE!!',
 
               }
 
@@ -410,6 +419,7 @@ Version 1.0 - Leakage solver for circular polarizers and extended polarization c
         a['EVPA']  = [0.0]
         a['PolSolve']  = []
         a['parang_corrected']  = True
+        a['target_field']  = ''
 
         #a = sys._getframe(len(inspect.stack())-1).f_globals
 
