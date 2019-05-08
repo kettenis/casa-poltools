@@ -28,7 +28,8 @@ typedef std::complex<double> cplx64d;
 int Nchan, Nvis, NSou, NAnt, NPar;
 int NITER = 0;
 int *A1, *A2;
-double *Wgt, *VARS, *Hessian, *DerVec;
+double *VARS, *Hessian, *DerVec;
+double **Wgt = new double*[4];
 double TotFlux;
 cplx64d *DATA, *COMPS;
 cplx64d *DR, *DL, *EPA, *EMA;
@@ -90,13 +91,19 @@ static PyObject *setData(PyObject *self, PyObject *args)
   NAnt = PyArray_SHAPE(reinterpret_cast<PyArrayObject*>(PAntRPy))[0];
 
 // get pointers to the data:
+  delete Wgt;
+  Wgt = new double*[4];
   DATA = (cplx64d *)PyArray_DATA(DATAPy);
   A1 = (int *)PyArray_DATA(A1Py);
   A2 = (int *)PyArray_DATA(A2Py);
   COMPS = (cplx64d *)PyArray_DATA(COMPSPy);
   EPA = (cplx64d *)PyArray_DATA(EPAsPy);
   EMA = (cplx64d *)PyArray_DATA(EMAsPy);
-  Wgt = (double *)PyArray_DATA(WgtPy);
+
+  for(i=0;i<4;i++){
+    Wgt[i] = (double *)PyArray_DATA(PyList_GetItem(WgtPy,i));
+  };
+
   PSou = (int *)PyArray_DATA(PSouPy);
   PAntR = (int *)PyArray_DATA(PAntRPy);
   PAntL = (int *)PyArray_DATA(PAntLPy);
@@ -132,19 +139,16 @@ if (DEBUG){
   double wgtaux;
   for (i=0; i < 2*NAnt; i++){
      RR = DATA[chi*4 + i*4*Nchan];
-     LL = DATA[chi*4 + i*4*Nchan+1];
-     RL = DATA[chi*4 + i*4*Nchan+2];
-     LR = DATA[chi*4 + i*4*Nchan+3];
-     wgtaux = Wgt[i*Nchan + chi];
+     RL = DATA[chi*4 + i*4*Nchan+1];
+     LR = DATA[chi*4 + i*4*Nchan+2];
+     LL = DATA[chi*4 + i*4*Nchan+3];
+     wgtaux = Wgt[0][i*Nchan + chi];
      printf("#%i (wgt %.2e): RR = (%-.2e,%-.2e) | RL = (%-.2e,%-.2e) | LR = (%-.2e,%-.2e) | LL = (%-.2e,%-.2e)\n",i,wgtaux,RR.real(),RR.imag(), RL.real(),RL.imag(), LR.real(),LR.imag(), LL.real(),LL.imag());
 
-
-
-
   };
-
-
 };
+
+
 
 // Return success:
   NITER = 0;
@@ -182,7 +186,7 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
   }; // Relative weights for RR, RL, LR, LL / XX, XY, YX, YY
   
   
-  double currWgt, ord2;
+  double currWgt[4], ord2;
   
   
   // Turn on/off 2nd order corrections:
@@ -236,7 +240,7 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
      for(k=0;k<NPar;k++){for(iaux4=0;iaux4<4;iaux4++){AllDer[k][iaux4] = cplx64d(0.,0.);};};
 
 // Proceed only if data are good:
-     if(Wgt[iaux3]>0.0){
+     if(Wgt[0][iaux3]>0.0 || Wgt[1][iaux3]>0.0){
     
       Ndata += 1;
       
@@ -279,10 +283,13 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
       };
 
       Ifac = std::abs(Itot);
-      currWgt = Wgt[iaux3]*Ifac;
+      currWgt[0] = Wgt[0][iaux3]*Ifac;
+      currWgt[1] = Wgt[1][iaux3]*Ifac;
+      currWgt[2] = Wgt[2][iaux3]*Ifac;
+      currWgt[3] = Wgt[3][iaux3]*Ifac;
 
       // Stokes I (i.e., (RR + LL)/2 ) from the data, corrected by inverse of Dt matrices:
-      Iwt += 0.5*std::abs((DATA[iaux2]*(1. + std::conj(DL[A2[i]])*DL[A1[i]])/EMA[i] + DATA[iaux2+1]*EMA[i]*(1. + std::conj(DR[A2[i]])*DR[A1[i]]) - DATA[iaux2+2]*(std::conj(DR[A2[i]])/EMA[i] + DL[A1[i]]*EMA[i]) - DATA[iaux2+3]*(DR[A1[i]]/EMA[i] + std::conj(DL[A2[i]])*EMA[i]))/(1.-DR[A1[i]]*DL[A1[i]])/(1.-std::conj(DR[A2[i]])*std::conj(DL[A2[i]])));
+      Iwt += 0.5*std::abs((DATA[iaux2]*(1. + ord2*std::conj(DL[A2[i]])*DL[A1[i]])/EMA[i] + DATA[iaux2+3]*EMA[i]*(1. + ord2*std::conj(DR[A2[i]])*DR[A1[i]]) - DATA[iaux2+1]*(std::conj(DR[A2[i]])/EMA[i] + DL[A1[i]]*EMA[i]) - DATA[iaux2+2]*(DR[A1[i]]/EMA[i] + std::conj(DL[A2[i]])*EMA[i]))/(1.-ord2*DR[A1[i]]*DL[A1[i]])/(1.-ord2*std::conj(DR[A2[i]])*std::conj(DL[A2[i]])));
     
       // Stokes I from the model:
       IRatio += Ifac;
@@ -308,9 +315,9 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
 
 // Residuals for each correlation product:
       resid[0] =  (DATA[iaux2  ] - RR);
-      resid[1] =  (DATA[iaux2+2] - RL); 
-      resid[2] =  (DATA[iaux2+3] - LR);
-      resid[3] =  (DATA[iaux2+1] - LL);
+      resid[1] =  (DATA[iaux2+1] - RL); 
+      resid[2] =  (DATA[iaux2+2] - LR);
+      resid[3] =  (DATA[iaux2+3] - LL);
 
 // Vector of derivative*residuals (first, for source components):
       for(k=0; k<NSou; k++){
@@ -318,15 +325,15 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
         if(iaux4>=0){
           res = 0.0;
           for(l=0;l<4;l++){
-            res += AllDer[iaux4][l].real()*resid[l].real()*F[l];
-            res += AllDer[iaux4][l].imag()*resid[l].imag()*F[l];
+            res += AllDer[iaux4][l].real()*resid[l].real()*F[l]*currWgt[l];
+            res += AllDer[iaux4][l].imag()*resid[l].imag()*F[l]*currWgt[l];
           }; 
-          DerVec[iaux4] += res*currWgt; res = 0.0;
+          DerVec[iaux4] += res; res = 0.0;
           for(l=0;l<4;l++){
-            res += AllDer[iaux4+1][l].real()*resid[l].real()*F[l];
-            res += AllDer[iaux4+1][l].imag()*resid[l].imag()*F[l];
+            res += AllDer[iaux4+1][l].real()*resid[l].real()*F[l]*currWgt[l];
+            res += AllDer[iaux4+1][l].imag()*resid[l].imag()*F[l]*currWgt[l];
           }; 
-          DerVec[iaux4+1] += res*currWgt;
+          DerVec[iaux4+1] += res;
         };
       };
 
@@ -344,17 +351,17 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
         AllDer[iaux4+1][0] = Im*AllDer[iaux4][0];
 
         
-        res  = AllDer[iaux4][0].real()*resid[0].real()*F[0];
-        res += AllDer[iaux4][0].imag()*resid[0].imag()*F[0];
-        res += AllDer[iaux4][1].real()*resid[1].real()*F[1];
-        res += AllDer[iaux4][1].imag()*resid[1].imag()*F[1];
-        DerVec[iaux4] += res*currWgt;
+        res  = AllDer[iaux4][0].real()*resid[0].real()*F[0]*currWgt[0];
+        res += AllDer[iaux4][0].imag()*resid[0].imag()*F[0]*currWgt[0];
+        res += AllDer[iaux4][1].real()*resid[1].real()*F[1]*currWgt[1];
+        res += AllDer[iaux4][1].imag()*resid[1].imag()*F[1]*currWgt[1];
+        DerVec[iaux4] += res;
 
-        res  = AllDer[iaux4+1][0].real()*resid[0].real()*F[0];
-        res += AllDer[iaux4+1][0].imag()*resid[0].imag()*F[0];
-        res += AllDer[iaux4+1][1].real()*resid[1].real()*F[1];
-        res += AllDer[iaux4+1][1].imag()*resid[1].imag()*F[1];
-        DerVec[iaux4+1] += res*currWgt;
+        res  = AllDer[iaux4+1][0].real()*resid[0].real()*F[0]*currWgt[0];
+        res += AllDer[iaux4+1][0].imag()*resid[0].imag()*F[0]*currWgt[0];
+        res += AllDer[iaux4+1][1].real()*resid[1].real()*F[1]*currWgt[1];
+        res += AllDer[iaux4+1][1].imag()*resid[1].imag()*F[1]*currWgt[1];
+        DerVec[iaux4+1] += res;
       };
 
       iaux4 = PAntL[A1[i]];
@@ -369,17 +376,17 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
         AllDer[iaux4][3] = RLc + ord2*RRc*std::conj(DL[A2[i]]);
         AllDer[iaux4+1][3] = Im*AllDer[iaux4][3];
 
-        res  = AllDer[iaux4][2].real()*resid[2].real()*F[2];
-        res += AllDer[iaux4][2].imag()*resid[2].imag()*F[2];
-        res += AllDer[iaux4][3].real()*resid[3].real()*F[3];
-        res += AllDer[iaux4][3].imag()*resid[3].imag()*F[3];
-        DerVec[iaux4] += res*currWgt;
+        res  = AllDer[iaux4][2].real()*resid[2].real()*F[2]*currWgt[2];
+        res += AllDer[iaux4][2].imag()*resid[2].imag()*F[2]*currWgt[2];
+        res += AllDer[iaux4][3].real()*resid[3].real()*F[3]*currWgt[3];
+        res += AllDer[iaux4][3].imag()*resid[3].imag()*F[3]*currWgt[3];
+        DerVec[iaux4] += res;
 
-        res  = AllDer[iaux4+1][2].real()*resid[2].real()*F[2];
-        res += AllDer[iaux4+1][2].imag()*resid[2].imag()*F[2];
-        res += AllDer[iaux4+1][3].real()*resid[3].real()*F[3];
-        res += AllDer[iaux4+1][3].imag()*resid[3].imag()*F[3];
-        DerVec[iaux4+1] += res*currWgt;
+        res  = AllDer[iaux4+1][2].real()*resid[2].real()*F[2]*currWgt[2];
+        res += AllDer[iaux4+1][2].imag()*resid[2].imag()*F[2]*currWgt[2];
+        res += AllDer[iaux4+1][3].real()*resid[3].real()*F[3]*currWgt[3];
+        res += AllDer[iaux4+1][3].imag()*resid[3].imag()*F[3]*currWgt[3];
+        DerVec[iaux4+1] += res;
       };
 
       iaux4 = PAntR[A2[i]];
@@ -395,17 +402,17 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
         AllDer[iaux4][0] = RLc + ord2*LLc*DR[A1[i]];
         AllDer[iaux4+1][0] = -Im*AllDer[iaux4][0];
 
-        res  = AllDer[iaux4][0].real()*resid[0].real()*F[0];
-        res += AllDer[iaux4][0].imag()*resid[0].imag()*F[0];
-        res += AllDer[iaux4][2].real()*resid[2].real()*F[2];
-        res += AllDer[iaux4][2].imag()*resid[2].imag()*F[2];
-        DerVec[iaux4] += res*currWgt;
+        res  = AllDer[iaux4][0].real()*resid[0].real()*F[0]*currWgt[0];
+        res += AllDer[iaux4][0].imag()*resid[0].imag()*F[0]*currWgt[0];
+        res += AllDer[iaux4][2].real()*resid[2].real()*F[2]*currWgt[2];
+        res += AllDer[iaux4][2].imag()*resid[2].imag()*F[2]*currWgt[2];
+        DerVec[iaux4] += res;
 
-        res  = AllDer[iaux4+1][0].real()*resid[0].real()*F[0];
-        res += AllDer[iaux4+1][0].imag()*resid[0].imag()*F[0];
-        res += AllDer[iaux4+1][2].real()*resid[2].real()*F[2];
-        res += AllDer[iaux4+1][2].imag()*resid[2].imag()*F[2];
-        DerVec[iaux4+1] += res*currWgt;
+        res  = AllDer[iaux4+1][0].real()*resid[0].real()*F[0]*currWgt[0];
+        res += AllDer[iaux4+1][0].imag()*resid[0].imag()*F[0]*currWgt[0];
+        res += AllDer[iaux4+1][2].real()*resid[2].real()*F[2]*currWgt[2];
+        res += AllDer[iaux4+1][2].imag()*resid[2].imag()*F[2]*currWgt[2];
+        DerVec[iaux4+1] += res;
       };
 
       iaux4 = PAntL[A2[i]];
@@ -420,23 +427,23 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
         AllDer[iaux4][3] = LRc + ord2*RRc*DL[A1[i]];
         AllDer[iaux4+1][3] = -Im*AllDer[iaux4][3];
 
-        res  = AllDer[iaux4][1].real()*resid[1].real()*F[1];
-        res += AllDer[iaux4][1].imag()*resid[1].imag()*F[1];
-        res += AllDer[iaux4][3].real()*resid[3].real()*F[3];
-        res += AllDer[iaux4][3].imag()*resid[3].imag()*F[3];
-        DerVec[iaux4] += res*currWgt;
+        res  = AllDer[iaux4][1].real()*resid[1].real()*F[1]*currWgt[1];
+        res += AllDer[iaux4][1].imag()*resid[1].imag()*F[1]*currWgt[1];
+        res += AllDer[iaux4][3].real()*resid[3].real()*F[3]*currWgt[3];
+        res += AllDer[iaux4][3].imag()*resid[3].imag()*F[3]*currWgt[3];
+        DerVec[iaux4] += res;
 
-        res  = AllDer[iaux4+1][1].real()*resid[1].real()*F[1];
-        res += AllDer[iaux4+1][1].imag()*resid[1].imag()*F[1];
-        res += AllDer[iaux4+1][3].real()*resid[3].real()*F[3];
-        res += AllDer[iaux4+1][3].imag()*resid[3].imag()*F[3];
-        DerVec[iaux4+1] += res*currWgt;
+        res  = AllDer[iaux4+1][1].real()*resid[1].real()*F[1]*currWgt[1];
+        res += AllDer[iaux4+1][1].imag()*resid[1].imag()*F[1]*currWgt[1];
+        res += AllDer[iaux4+1][3].real()*resid[3].real()*F[3]*currWgt[3];
+        res += AllDer[iaux4+1][3].imag()*resid[3].imag()*F[3]*currWgt[3];
+        DerVec[iaux4+1] += res;
       };
 
       // Add up to the Chi Square:
       for(iaux4=0;iaux4<4;iaux4++){
-        ChiSq += resid[iaux4].real()*resid[iaux4].real()*currWgt*F[iaux4];
-        ChiSq += resid[iaux4].imag()*resid[iaux4].imag()*currWgt*F[iaux4];
+        ChiSq += resid[iaux4].real()*resid[iaux4].real()*currWgt[iaux4]*F[iaux4];
+        ChiSq += resid[iaux4].imag()*resid[iaux4].imag()*currWgt[iaux4]*F[iaux4];
       };
 
       
@@ -444,9 +451,9 @@ static PyObject *getHessian(PyObject *self, PyObject *args)
      for(k=0;k<currPar;k++){
        for(l=0;l<=k;l++){
          for(iaux4=0;iaux4<4;iaux4++){
-           res  = AllDer[VisPar[k]][iaux4].real()*AllDer[VisPar[l]][iaux4].real()*F[iaux4];
-           res += AllDer[VisPar[k]][iaux4].imag()*AllDer[VisPar[l]][iaux4].imag()*F[iaux4];
-           Hessian[VisPar[k]*NPar + VisPar[l]] += res*currWgt;
+           res  = AllDer[VisPar[k]][iaux4].real()*AllDer[VisPar[l]][iaux4].real()*F[iaux4]*currWgt[iaux4];
+           res += AllDer[VisPar[k]][iaux4].imag()*AllDer[VisPar[l]][iaux4].imag()*F[iaux4]*currWgt[iaux4];
+           Hessian[VisPar[k]*NPar + VisPar[l]] += res;
            if(k!=l){Hessian[VisPar[l]*NPar + VisPar[k]] = Hessian[VisPar[k]*NPar + VisPar[l]];};
          };
        };

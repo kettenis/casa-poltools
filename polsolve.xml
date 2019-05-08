@@ -89,6 +89,22 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
       <value></value>
     </param>
 
+    <param type="boolean" name="plot_parang" mustexist="false">
+      <description>If True, plot the time evolution of the antenna feed angles (i.e., parallactic angle plus correction from the antenna mounts).</description>
+      <value>False</value>
+    </param>
+
+    <param type="any" name="min_elev_plot" mustexist="false">
+      <description> In degrees. If plot_parang is True, points with elevations lower than this limit will be plotted in red. THIS DOES NOT FLAG THE DATA. If you want to flag them, run the flagdata task.</description>
+      <value>10.0</value>
+    </param>
+
+
+    <param type="any" name="wgt_power" mustexist="false">
+      <description> Power for the visibility weights. Unity means to leave the weights untouched (i.e., equivalent to natural weighting, but for the fit). Zero means equal weights for all visibilities (i.e., equivalent to uniform weighting for the fit).</description>
+      <value>1.0</value>
+    </param>
+
 
 </input>
 

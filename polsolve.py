@@ -11,7 +11,7 @@ from taskinit import casalog
 from taskinit import xmlpath
 #from taskmanager import tm
 import task_polsolve
-def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True, target_field=''):
+def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True, target_field='', plot_parang=False, min_elev_plot=10.0, wgt_power=1.0):
 
         """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 
@@ -81,12 +81,15 @@ def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=
         mytmp['PolSolve'] = PolSolve
         mytmp['parang_corrected'] = parang_corrected
         mytmp['target_field'] = target_field
+        mytmp['plot_parang'] = plot_parang
+        mytmp['min_elev_plot'] = min_elev_plot
+        mytmp['wgt_power'] = wgt_power
 	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.utils().torecord(pathname+'polsolve.xml')
 
         casalog.origin('polsolve')
         if trec.has_key('polsolve') and casac.utils().verify(mytmp, trec['polsolve']) :
-	    result = task_polsolve.polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field)
+	    result = task_polsolve.polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
 
 	else :
 	  result = False

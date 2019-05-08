@@ -71,6 +71,7 @@
 import gc
 import os
 import numpy as np
+import pylab as pl
 from taskinit import gentools
 from scipy.optimize import minimize
 import PolSolver as PS 
@@ -102,6 +103,26 @@ if __name__=='__main__':
   PolSolve           =  [True]
   parang_corrected    =  True
   target_field       =  ""
+
+
+  vis                =  "3C279_3601_SELFCAL.ms"
+#  vis =                 "3C279_POLSIM_3601.ms"
+  spw                =  0
+  field              =  "0"
+  mounts             =  ['AZ', 'NR', 'NR', 'NL', 'AZ', 'NL', 'NL', 'AZ','NL']
+  DR                 =  []
+  DL                 =  []
+  DRSolve            =  [True, True, True, True, False, True, True, True,False]
+  DLSolve            =  [True, True, True, True, False, True, True, True,False]
+  CLEAN_models       =  ['3C279_IMAGE.fits_CC00.dat', '3C279_IMAGE.fits_CC01.dat']
+  Pfrac              =  [0.0, 0.0]
+  EVPA               =  [0.0, 0.0]
+  PolSolve           =  [True, True]
+  parang_corrected    =  True
+  target_field       =  ""
+  plot_parang=True
+  min_elev_plot = 5.0
+  wgt_power = 1.0
 #
 #
 #
@@ -114,7 +135,7 @@ if __name__=='__main__':
 
 def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = [],
                 DRSolve = [], DLSolve = [], CLEAN_models = [1.0], Pfrac = [0.0], 
-                EVPA = [0.0], PolSolve = [True], parang_corrected = True, target_field = ''):
+                EVPA = [0.0], PolSolve = [True], parang_corrected = True, target_field = '', plot_parang=False, min_elev_plot=10.0, wgt_power=1.0):
 
 
 
@@ -126,10 +147,11 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
+  STOKES_CODES = {'I': 1,  'Q': 2,  'U': 3,  'V': 4, 
+                 'RR': 5, 'RL': 6, 'LR': 7, 'LL': 8,
+                 'XX': 9, 'XY':10, 'YX':11, 'YY':12}
 
-
-
-
+  POL_ORDER = ['RR','RL','LR','LL']
 
 ###########################################
 # HELPER FUNCTIONS
@@ -194,15 +216,19 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
-
-
-
+# Return GMST from UT time:
+  def GMST(MJD):
+    Days = MJD/86400.  
+    t = (Days -51544.0)/36525.
+    Hh = (Days - np.floor(Days))
+    GMsec = 24110.54841 + 8640184.812866*t + 0.093104*t*t - 0.0000062*t*t*t
+    return (GMsec/86400. + Hh)*2.*np.pi
 
 
 
 # Helper function to compute feed (i.e., mount + parallactic) angles:
 
-  def getParangle(vis,spw,field,mounts, scan = -1):
+  def getParangle(vis,spw,field,mounts, scan = -1,doplot=False):
       
     """ Returns feed rotation (mount + parangle) for the visibilities
     corresponding to field (id) or to the scan number (if >= 0). """
@@ -238,7 +264,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     else:
       ms.select({'scan_number':scan})
       
-    DATA = ms.getdata(['u','v','w','antenna1','antenna2'])
+    DATA = ms.getdata(['u','v','w','antenna1','antenna2', 'time'])
     Nvis  = len(DATA['u'])
     
     ms.close()
@@ -247,6 +273,8 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
     PAs = np.zeros((Nvis,2))
     
+    GOODS = np.ones(Nvis,dtype=np.bool)
+
     V2 = SinDec*DATA['v'] - CosDec*DATA['w']
     
     Bx = -(apos[0,DATA['antenna2']]-apos[0,DATA['antenna1']])
@@ -259,18 +287,34 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     CT1 = CosDec*Tlat[DATA['antenna1']]
     CT2 = CosDec*Tlat[DATA['antenna2']]
     
-    HAng = np.arctan2(SH,CH)
-   
+    HAng2 = np.arctan2(SH,CH)
+    HAng = (GMST(DATA['time']) - RA)%(2.*np.pi)
+
+    print '\n'
+    print DATA['time'][10],GMST(DATA['time'])[10] , HAng[10], HAng2[10]
+    print DATA['time'][50], GMST(DATA['time'])[50], HAng[50], HAng2[50]
+
+
     H1 = HAng + Lon[DATA['antenna1']]
     H2 = HAng + Lon[DATA['antenna2']]
     
     
-    Autos = (CH==0.)*(SH==0.)
+ #   Autos = (CH==0.)*(SH==0.)
+    Autos = DATA['antenna1']==DATA['antenna2']
+
     H1[Autos] = 0.0
     H2[Autos] = 0.0
     
+    GOODS[Autos] = False
+
     E1 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna1']])+np.cos(Lat[DATA['antenna1']])*CosDec*np.cos(H1))
     E2 = np.arcsin(SinDec*np.sin(Lat[DATA['antenna2']])+np.cos(Lat[DATA['antenna2']])*CosDec*np.cos(H2))
+
+    GOODS[E1<min_elev_plot*np.pi/180.] = False
+    GOODS[E2<min_elev_plot*np.pi/180.] = False
+    GOODS[E1>np.pi/2.] = False
+    GOODS[E2>np.pi/2.] = False
+
 
     PAZ1 = np.arctan2(np.sin(H1), CT1 - SinDec*np.cos(H1))
     PAZ2 = np.arctan2(np.sin(H2), CT2 - SinDec*np.cos(H2))
@@ -304,11 +348,18 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
         PAs[filt,1] = -PAZ2[filt] + E2[filt]
 
 # Release memory:
-    del DATA['antenna1'], DATA['antenna2'], DATA['u'], DATA['v'], DATA['w']
-    del H1, H2, E1, E2, PAZ1, PAZ2, Bx, By, Bz, CH, SH, CT1, CT2, V2, filt
+    if doplot:
+      TT = np.copy(DATA['time']); A1 = np.copy(DATA['antenna1']); A2 = np.copy(DATA['antenna2'])
+
+    del DATA['antenna1'], DATA['antenna2'], DATA['u'], DATA['v'], DATA['w'], DATA['time']
+#    del H1, H2, E1, E2, PAZ1, PAZ2, Bx, By, Bz, CH, SH, CT1, CT2, V2, filt
+    del H1, H2, E1, E2, PAZ1, PAZ2, CT1, CT2, filt
 
 # Finished!
-    return PAs
+    if doplot:
+      return [-PAs, TT, A1, A2, GOODS]
+    else:
+      return PAs
 
 
 
@@ -587,22 +638,37 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 # Metadata and flags:
   Nchan,Nvis = np.shape(DATA['data'])[1:]
-  GoodData = np.prod(np.logical_not(DATA['flag']),axis=0)
-  GoodWgt = np.sum(DATA['weight'],axis=0)
+
+  GoodData = np.logical_not(DATA['flag']) 
+  GoodWgt =  np.copy(DATA['weight']) 
+
+
+#################
+# Lines for testing (same weight for all corr products)
+#  GoodData[:] = np.prod(np.logical_not(DATA['flag']),axis=0)[np.newaxis,:]
+#  GoodWgt[:] = np.sum(DATA['weight'],axis=0)[np.newaxis,:]
+#################
+
 
 # Weight (set to zero for bad data and autocorrs):
-  Wgt = np.zeros((Nvis,Nchan))
-  Wgt[:,:] = GoodWgt[:,np.newaxis]
-  Wgt[np.logical_not(np.transpose(GoodData))] = 0.0
-  Wgt[DATA['antenna1']==DATA['antenna2'],:] = 0.0
+  Wgt = [np.zeros((Nvis,Nchan)) for i in range(4)]
+  for i in range(4):
+    j = polprods.index(POL_ORDER[i])  
+    Wgt[i][:,:] = GoodWgt[j,:,np.newaxis]
+    Wgt[i][np.logical_not(np.transpose(GoodData[j,...]))] = 0.0
+    Wgt[i][DATA['antenna1']==DATA['antenna2'],:] = 0.0
+
+# Correct weight power:
+    Bads = Wgt[i] == 0.0
+    Wgt[i][:] = np.power(Wgt[i],wgt_power)
+    Wgt[i][Bads] = 0.0
+
+
 
 # Arrange data optimally (i.e., [time,channel,polariz]):
   DATAPol = np.zeros((Nvis,Nchan,4),dtype=np.complex128)
-  DATAPol[:,:,0] = np.transpose(DATA['data'][polprods.index('RR'),:,:])
-  DATAPol[:,:,1] = np.transpose(DATA['data'][polprods.index('LL'),:,:])
-  DATAPol[:,:,2] = np.transpose(DATA['data'][polprods.index('RL'),:,:])
-  DATAPol[:,:,3] = np.transpose(DATA['data'][polprods.index('LR'),:,:])
-
+  for i in range(4):
+    DATAPol[:,:,i] = np.transpose(DATA['data'][polprods.index(POL_ORDER[i]),:,:])
 
 # Free some memory:
   del GoodData, GoodWgt, DATA['data'], DATA['weight'], DATA['flag']
@@ -615,24 +681,125 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
   printMsg('\nComputing parallactic angles')
 
-  PAs = getParangle(vis,spw,fid,mounts)
+
+  if plot_parang:
+
+    NMAX = 8  # Maximum number of antennas in the plot
+    col = ['r','g','b','c','m','y','k','w'] # colors
+
+    PAs, TT, A1, A2, FG = getParangle(vis,spw,fid,mounts,doplot=True)
+
+    MIN = PAs[:,0] < -np.pi
+    PAs[MIN,0] += 2.*np.pi
+    MIN = PAs[:,1] < -np.pi
+    PAs[MIN,1] += 2.*np.pi
+
+    MAX = PAs[:,0] > np.pi
+    PAs[MAX,0] -= 2.*np.pi
+    MAX = PAs[:,1] > np.pi
+    PAs[MAX,1] -= 2.*np.pi
+
+
+    UT = TT/86400.
+    UT -= int(np.min(UT))
+    UT *= 24.
+
+  
+    tb.open(vis+'/ANTENNA')
+    NAMES = tb.getcol('NAME')
+    tb.close()
+
+
+    OFF = open('polsolve_feed-angles.dat','w')
+
+
+# Subsets of plots of NMAX antennas:
+    SUBSET = []
+    j = 0
+    i = 0
+    while i< len(NAMES):
+      if i+NMAX <= len(NAMES):
+        SUBSET.append(NAMES[i:i+NMAX])
+        i += NMAX
+        j += 1
+      else:
+        SUBSET.append(NAMES[i:])
+        j += 1
+        break
+
+
+    for k in range(j):
+      fig = pl.figure()
+      sub = fig.add_subplot(111)
+
+
+
+      for i in range(len(SUBSET[k])):
+
+        sub.set_ylabel('Feed (deg.)')
+
+        if i + NMAX*k >0:  
+
+          mask = (A2==i+NMAX*k)*(A1!=i+NMAX*k)*FG
+          TOPLOT = np.copy(PAs[mask,1]*180./np.pi)
+          PLOTTED = np.sum(mask)>0
+
+          for mi,m in enumerate(mask):
+            if m:  
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,1]*180./np.pi
+
+          sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
+         
+          mask = (A1==i+NMAX*k)*(A2!=i+NMAX*k)*FG
+          TOPLOT = np.copy(PAs[mask,0]*180./np.pi)
+
+          sub.plot( UT[mask], TOPLOT, 'o%s'%col[i])
+
+          for mi,m in enumerate(mask):
+            if m:  
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,0]*180./np.pi
+
+
+        else:
+          mask = (A1==0)*(A2!=1)*(A2!=0)*FG  #+(A2==3))
+          TOPLOT = np.copy(PAs[mask,0]*180./np.pi)
+
+          sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
+
+
+          for mi,m in enumerate(mask):
+            if m:  
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,0]*180./np.pi
+ 
+        pl.legend(numpoints=1)
+        
+      sub.set_xlim((np.min(UT),np.max(UT) + 0.3*(np.max(UT)-np.min(UT))))
+      sub.set_ylim((-189.,189.))
+      sub.set_xlabel('UT (h)')  
+
+      pl.savefig('%s_Parang_plot_%i.png'%(vis,k))
+     
+    OFF.close()
+    
+    raw_input('Press ENTER to continue...')
+  
+  else:
+ 
+    PAs = getParangle(vis,spw,fid,mounts)
+  
+
 
 #######################################
 
   gc.collect()
   
 
-# Sum and difference of PANGS (in complex form):
-  EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
 
+#    DATAPol[:,:,0] *= EMA[:,np.newaxis]
+#    DATAPol[:,:,1] /= EMA[:,np.newaxis]
+#    DATAPol[:,:,2] *= EPA[:,np.newaxis]
+#    DATAPol[:,:,3] /= EPA[:,np.newaxis]
 
-# Get data back into antenna frame (if it was in the sky frame):
-  if parang_corrected:
-    printMsg("Undoing parang correction")
-    DATAPol[:,:,0] *= EMA[:,np.newaxis]
-    DATAPol[:,:,1] /= EMA[:,np.newaxis]
-    DATAPol[:,:,2] *= EPA[:,np.newaxis]
-    DATAPol[:,:,3] /= EPA[:,np.newaxis]
 
 
 ################
@@ -654,12 +821,13 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     COMPS[:,:,NmodComp] += COMPS[:,:,i]
 
 # How much flux do we have in the DATA?
-  DSUM = 0.5*np.sum(np.abs(np.average(Wgt*(DATAPol[:,:,0]/EMA[:,np.newaxis] + DATAPol[:,:,1]*EMA[:,np.newaxis]),axis=1)))/(np.sum(np.average(Wgt,axis=1)))
+  DSUM = 0.5*np.sum(np.abs(np.average((Wgt[0]+Wgt[1])*(DATAPol[:,:,polprods.index('RR')] + DATAPol[:,:,polprods.index('LL')]),axis=1)))/(np.sum(np.average(Wgt[0]+Wgt[1],axis=1)))
+
 
 #  print np.max(Wgt), DSUM
 
 # How much flux do we have in the MODEL?
-  MSUM = np.sum(np.abs(np.average(Wgt*COMPS[:,:,NmodComp],axis=1)))/(np.sum(np.average(Wgt,axis=1)))
+  MSUM = np.sum(np.abs(np.average((Wgt[0]+Wgt[1])*COMPS[:,:,NmodComp],axis=1)))/(np.sum(np.average((Wgt[0]+Wgt[1]),axis=1)))
   
 #  print np.max(Wgt), MSUM
   
@@ -667,7 +835,48 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   FluxFactor = MSUM/DSUM
   printMsg('All model components describe up to %.2f percent of the signal\n'%(FluxFactor*100.))
   
-  
+ 
+
+
+
+
+
+
+# Sum and difference of PANGS (in complex form):
+  EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
+
+# Get data back into antenna frame (if it was in the sky frame):
+  if parang_corrected:
+    printMsg("Undoing parang correction")
+    for i in range(4):
+      if POL_ORDER[i][0]=='R':
+        DATAPol[:,:,i] *= np.exp(1.j*(PAs[:,0]))[:,np.newaxis]
+      else:
+        DATAPol[:,:,i] /= np.exp(1.j*(PAs[:,0]))[:,np.newaxis]
+
+      if POL_ORDER[i][1]=='R':
+        DATAPol[:,:,i] /= np.exp(1.j*(PAs[:,1]))[:,np.newaxis]
+      else:
+        DATAPol[:,:,i] *= np.exp(1.j*(PAs[:,1]))[:,np.newaxis]
+
+
+
+
+
+
+
+
+
+
+
+
+# Code for testing (turned off):
+  if False:
+    import pickle as pk
+    OFF = open('FTMODEL.dat','w')
+    pk.dump([U,V,COMPS,DATAPol,Wgt],OFF)
+    OFF.close()
+
 ################
 
 
@@ -983,7 +1192,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
       Re = DR[si].real ; Im = DR[si].imag
       ErrRe = 0.0 ; ErrIm = 0.0
     ErrR.append(np.sqrt(ErrRe*ErrIm))
-    printMsg('Antenna #%i:  Real = % .2e +/- %.1e; Imag = % .2e +/- %.1e'%(si,Re,ErrRe,Im,ErrIm))
+    printMsg('Antenna #%i (%s):  Real = % .2e +/- %.1e; Imag = % .2e +/- %.1e | Amp = %.4f | Phase: %.2f deg.'%(si,anam[si], Re,ErrRe,Im,ErrIm, np.sqrt(Re*Re+Im*Im),np.arctan2(Im,Re)*180./np.pi))
 
   printMsg('\n Dterms (Left):')
   for si in range(nant):
@@ -998,7 +1207,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
       Re = DL[si].real ; Im = DL[si].imag
       ErrRe = 0.0 ; ErrIm = 0.0
     ErrL.append(np.sqrt(ErrRe*ErrIm))
-    printMsg('Antenna #%i:  Real = % .2e +/- %.1e; Imag = % .2e +/- %.1e'%(si,Re,ErrRe,Im,ErrIm))
+    printMsg('Antenna #%i (%s):  Real = % .2e +/- %.1e; Imag = % .2e +/- %.1e | Amp = %.4f | Phase: %.2f deg.'%(si,anam[si], Re,ErrRe,Im,ErrIm, np.sqrt(Re*Re+Im*Im),np.arctan2(Im,Re)*180./np.pi))
 
 
 # Write CovMatrix:

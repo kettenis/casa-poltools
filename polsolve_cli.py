@@ -27,7 +27,7 @@ class polsolve_cli_:
        self.__bases__ = (polsolve_cli_,)
        self.__doc__ = self.__call__.__doc__
 
-       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, 'target_field':None, }
+       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, 'target_field':None, 'plot_parang':None, 'min_elev_plot':None, 'wgt_power':None, }
 
 
     def result(self, key=None):
@@ -35,7 +35,7 @@ class polsolve_cli_:
 	    return None
 
 
-    def __call__(self, vis=None, spw=None, field=None, mounts=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, target_field=None, ):
+    def __call__(self, vis=None, spw=None, field=None, mounts=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, target_field=None, plot_parang=None, min_elev_plot=None, wgt_power=None, ):
 
         """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 
@@ -83,6 +83,15 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
 
 		target_field:	List of sources to which apply the Dterm (and parangle) correction. It must follow the CASA syntax if a range of field ids is given. Empy list means NOT to apply the Dterms (i.e., just save them in a calibration table). If you want to apply the calibration, DO NOT FORGET TO *ALWAYS* RUN CLEARCAL BEFORE POLSOLVE!!
 		   Default Value: 
+
+		plot_parang:	If True, plot the time evolution of the antenna feed angles (i.e., parallactic angle plus correction from the antenna mounts).
+		   Default Value: False
+
+		min_elev_plot:	 In degrees. If plot_parang is True, points with elevations lower than this limit will be plotted in red. THIS DOES NOT FLAG THE DATA. If you want to flag them, run the flagdata task.
+		   Default Value: 10.0
+
+		wgt_power:	 Power for the visibility weights. Unity means to leave the weights untouched (i.e., equivalent to natural weighting, but for the fit). Zero means equal weights for all visibilities (i.e., equivalent to uniform weighting for the fit).
+		   Default Value: 1.0
 
 	Returns: bool
 
@@ -199,6 +208,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
             myparams['PolSolve'] = PolSolve = self.parameters['PolSolve']
             myparams['parang_corrected'] = parang_corrected = self.parameters['parang_corrected']
             myparams['target_field'] = target_field = self.parameters['target_field']
+            myparams['plot_parang'] = plot_parang = self.parameters['plot_parang']
+            myparams['min_elev_plot'] = min_elev_plot = self.parameters['min_elev_plot']
+            myparams['wgt_power'] = wgt_power = self.parameters['wgt_power']
 
 
 	result = None
@@ -222,6 +234,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         mytmp['PolSolve'] = PolSolve
         mytmp['parang_corrected'] = parang_corrected
         mytmp['target_field'] = target_field
+        mytmp['plot_parang'] = plot_parang
+        mytmp['min_elev_plot'] = min_elev_plot
+        mytmp['wgt_power'] = wgt_power
 	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
 	trec = casac.casac.utils().torecord(pathname+'polsolve.xml')
 
@@ -247,7 +262,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
               casalog.post(scriptstr[0]+'\n', 'INFO')
           else :
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
-          result = polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field)
+          result = polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
           if (casa['state']['telemetry-enabled']):
               casalog.poststat('End Task: ' + tname)
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
@@ -315,6 +330,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         a['PolSolve']  = []
         a['parang_corrected']  = True
         a['target_field']  = ''
+        a['plot_parang']  = False
+        a['min_elev_plot']  = 10.0
+        a['wgt_power']  = 1.0
 
 
 ### This function sets the default values but also will return the list of
@@ -398,6 +416,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
                'PolSolve': 'List of booleans (one per source component) \n that tell which source components \n are to be fitted in polarization. \n If PolSolve[i] is True, the fractional \n polarization and EVPA of the ith source \n component will be fitted, together with \n the antenna Dterms. If False, all \n Stokes parameters of the ith component will \n be fixed in the fit. \n Empty list means to fit the polarization \n of all the source components.',
                'parang_corrected': 'If True, the data are assumed to be \n already corrected for parallactic angle. \n This is usually the case, unless \n you are working with data generated with \n polsimulate with no parang correction.',
                'target_field': 'List of sources to which apply the Dterm (and parangle) correction. It must follow the CASA syntax if a range of field ids is given. Empy list means NOT to apply the Dterms (i.e., just save them in a calibration table). If you want to apply the calibration, DO NOT FORGET TO *ALWAYS* RUN CLEARCAL BEFORE POLSOLVE!!',
+               'plot_parang': 'If True, plot the time evolution of the antenna feed angles (i.e., parallactic angle plus correction from the antenna mounts).',
+               'min_elev_plot': ' In degrees. If plot_parang is True, points with elevations lower than this limit will be plotted in red. THIS DOES NOT FLAG THE DATA. If you want to flag them, run the flagdata task.',
+               'wgt_power': ' Power for the visibility weights. Unity means to leave the weights untouched (i.e., equivalent to natural weighting, but for the fit). Zero means equal weights for all visibilities (i.e., equivalent to uniform weighting for the fit).',
 
               }
 
@@ -420,6 +441,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         a['PolSolve']  = []
         a['parang_corrected']  = True
         a['target_field']  = ''
+        a['plot_parang']  = False
+        a['min_elev_plot']  = 10.0
+        a['wgt_power']  = 1.0
 
         #a = sys._getframe(len(inspect.stack())-1).f_globals
 
