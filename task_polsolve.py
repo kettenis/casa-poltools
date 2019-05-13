@@ -87,42 +87,27 @@ __version__ = '1.0'
 #####################
 # UNIT TEST LINES:
 if __name__=='__main__':
-    
-  vis                =  "3C279_POLSIM_3597.ms"
-  vis = 'TOTOMS.ms'
+
+  vis                =  "PointSource_POLSIM_3601.ms"
   spw                =  0
   field              =  "0"
-  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'AZ', 'NL']
+  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'NL', 'AZ']
   DR                 =  []
   DL                 =  []
-  DRSolve            =  []
-  DLSolve            =  []
-  CLEAN_models       =  [1.0]
+  DRSolve            =  [True, True, True, True, True, True, True, True]
+  DLSolve            =  [True, True, True, True, True, True, True, True]
+  CLEAN_models       =  1.0
   Pfrac              =  [0.0]
   EVPA               =  [0.0]
   PolSolve           =  [True]
   parang_corrected    =  True
   target_field       =  ""
+  plot_parang        =  True
+  min_elev_plot      =  0.0
+  wgt_power          =  1.0
 
 
-  vis                =  "3C279_3601_SELFCAL.ms"
-#  vis =                 "3C279_POLSIM_3601.ms"
-  spw                =  0
-  field              =  "0"
-  mounts             =  ['AZ', 'NR', 'NR', 'NL', 'AZ', 'NL', 'NL', 'AZ','NL']
-  DR                 =  []
-  DL                 =  []
-  DRSolve            =  [True, True, True, True, False, True, True, True,False]
-  DLSolve            =  [True, True, True, True, False, True, True, True,False]
-  CLEAN_models       =  ['3C279_IMAGE.fits_CC00.dat', '3C279_IMAGE.fits_CC01.dat']
-  Pfrac              =  [0.0, 0.0]
-  EVPA               =  [0.0, 0.0]
-  PolSolve           =  [True, True]
-  parang_corrected    =  True
-  target_field       =  ""
-  plot_parang=True
-  min_elev_plot = 5.0
-  wgt_power = 1.0
+
 #
 #
 #
@@ -216,7 +201,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
-# Return GMST from UT time:
+# Return GMST from UT time (from NRAO webpage):
   def GMST(MJD):
     Days = MJD/86400.  
     t = (Days -51544.0)/36525.
@@ -275,24 +260,24 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     
     GOODS = np.ones(Nvis,dtype=np.bool)
 
-    V2 = SinDec*DATA['v'] - CosDec*DATA['w']
+ #   V2 = SinDec*DATA['v'] - CosDec*DATA['w']
     
-    Bx = -(apos[0,DATA['antenna2']]-apos[0,DATA['antenna1']])
-    By = -(apos[1,DATA['antenna2']]-apos[1,DATA['antenna1']])
-    Bz = -(apos[2,DATA['antenna2']]-apos[2,DATA['antenna1']])
+ #   Bx = -(apos[0,DATA['antenna2']]-apos[0,DATA['antenna1']])
+ #   By = -(apos[1,DATA['antenna2']]-apos[1,DATA['antenna1']])
+ #   Bz = -(apos[2,DATA['antenna2']]-apos[2,DATA['antenna1']])
 
-    CH = DATA['u']*By - V2*Bx
-    SH = DATA['u']*Bx + V2*By
+ #   CH = DATA['u']*By - V2*Bx
+ #   SH = DATA['u']*Bx + V2*By
     
     CT1 = CosDec*Tlat[DATA['antenna1']]
     CT2 = CosDec*Tlat[DATA['antenna2']]
     
-    HAng2 = np.arctan2(SH,CH)
+ #   HAng2 = np.arctan2(SH,CH)
     HAng = (GMST(DATA['time']) - RA)%(2.*np.pi)
 
-    print '\n'
-    print DATA['time'][10],GMST(DATA['time'])[10] , HAng[10], HAng2[10]
-    print DATA['time'][50], GMST(DATA['time'])[50], HAng[50], HAng2[50]
+ #   print '\n'
+ #   print DATA['time'][10],GMST(DATA['time'])[10] , HAng[10], HAng2[10]
+ #   print DATA['time'][50], GMST(DATA['time'])[50], HAng[50], HAng2[50]
 
 
     H1 = HAng + Lon[DATA['antenna1']]
@@ -357,7 +342,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 # Finished!
     if doplot:
-      return [-PAs, TT, A1, A2, GOODS]
+      return [PAs, TT, A1, A2, GOODS]
     else:
       return PAs
 
@@ -458,6 +443,9 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 # Load the source model components:
 
 # First, some sanity checks:
+  if not (type(CLEAN_models) is list):
+    CLEAN_models = [CLEAN_models]  
+
   if len(set([len(CLEAN_models),len(Pfrac),len(EVPA),len(PolSolve)]))>1:
     printError("ERROR! CLEAN_models, Pfrac, EVPA, and PolSolve should all have the same length!")
 
@@ -467,9 +455,6 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 # Flux density and offset (RA, Dec) of the deltas for each component:
   DELTAS = [[] for dd in CLEAN_models]
   for mi in range(NmodComp):
-
-
-
 
 # Case of AIPS-like CC files:
     if type(CLEAN_models[mi]) is str:
@@ -610,7 +595,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   printMsg('\nThere are %i antennas'%nant)
   F = {True: 'FITTABLE',False: 'FIXED   '}
   for ai in range(nant):
-    printMsg('Antenna %i. Leakage: DR (%.3f, %.3f, %s); DL (%.3f, %.3f, %s)'%(ai,DR[ai].real, DR[ai].imag,F[DRSolve[ai]], DL[ai].real, DL[ai].imag, F[DLSolve[ai]]))
+    printMsg('Ant %i (%s). Mount %s. Leakage: DR (%.3f, %.3f, %s); DL (%.3f, %.3f, %s)'%(ai,anam[ai],mounts[ai],DR[ai].real, DR[ai].imag,F[DRSolve[ai]], DL[ai].real, DL[ai].imag, F[DLSolve[ai]]))
 
 
 # Get polarization info from MS:
@@ -679,7 +664,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 ######################################
 # Computing parallactic angles:
 
-  printMsg('\nComputing parallactic angles')
+  printMsg('\nComputing parallactic (feed) angles')
 
 
   if plot_parang:
@@ -736,40 +721,40 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
       for i in range(len(SUBSET[k])):
 
-        sub.set_ylabel('Feed (deg.)')
+        sub.set_ylabel('Feed angle (deg.)')
 
         if i + NMAX*k >0:  
 
           mask = (A2==i+NMAX*k)*(A1!=i+NMAX*k)*FG
-          TOPLOT = np.copy(PAs[mask,1]*180./np.pi)
+          TOPLOT = np.copy(-PAs[mask,1]*180./np.pi)
           PLOTTED = np.sum(mask)>0
 
           for mi,m in enumerate(mask):
             if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,1]*180./np.pi
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,1]*180./np.pi
 
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
          
           mask = (A1==i+NMAX*k)*(A2!=i+NMAX*k)*FG
-          TOPLOT = np.copy(PAs[mask,0]*180./np.pi)
+          TOPLOT = np.copy(-PAs[mask,0]*180./np.pi)
 
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i])
 
           for mi,m in enumerate(mask):
             if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,0]*180./np.pi
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
 
 
         else:
           mask = (A1==0)*(A2!=1)*(A2!=0)*FG  #+(A2==3))
-          TOPLOT = np.copy(PAs[mask,0]*180./np.pi)
+          TOPLOT = np.copy(-PAs[mask,0]*180./np.pi)
 
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
 
 
           for mi,m in enumerate(mask):
             if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], PAs[mi,0]*180./np.pi
+              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
  
         pl.legend(numpoints=1)
         
@@ -781,7 +766,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
      
     OFF.close()
     
-    raw_input('Press ENTER to continue...')
+  #  raw_input('Press ENTER to continue...')
   
   else:
  

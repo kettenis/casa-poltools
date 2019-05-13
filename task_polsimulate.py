@@ -78,50 +78,48 @@ __version__ = '1.3.2'
 if __name__=='__main__':
 
 
-
-
-  vis                =  "3C279_POLSIM_3601.ms"
-  reuse              =  True
+  vis                =  "PointSource_POLSIM_3601.ms"
+  reuse              =  False
   array_configuration    =  "VLBA.cfg"
   elevation_cutoff    =  5.0
   feed               =  "circular"
-  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'AZ', 'NL']
+  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'NL', 'AZ']
   ConstDt0           =  [(-0.03516774723383416+0.010911365715113678j), (-0.06305722746675077-0.09807664592606191j), (0.10178116450844127-0.015678909756009423j), (0.0046894586588836-0.09894084626482338j), (-0.0756087117396087+0.015405915237481402j), (-0.07993010954321549+0.02609014016289389j), (-0.04171102013325035-0.020256510402310888j), (-0.04178518140481923+0.12863042947978737j)]
   ConstDt1           =  [(-0.03516774723383416+0.010911365715113678j), (0.04497837070143698+0.10576596225055733j), (-0.016260651022453887-0.01625951089924865j), (0.10966755663245774+0.053294078413396444j), (-0.06520477582429891+0.07535556160916176j), (-0.03218178422308766-0.03234234399793451j), (0.016802935525419036-0.13286668365679152j), (-0.11978596059118285-0.03904774508617866j)]
-  LO                 =  229000000000.0
+  LO                 =  2.28e+11
   BBs                =  [0.0]
-  spw_width          =  1000000000.0
+  spw_width          =  1874000000.0
   nchan              =  1
-  model_image        =  ['CLEAN_3601_3C279.I', 'CLEAN_3601_3C279.Q', 'CLEAN_3601_3C279.U', 'CLEAN_3601_3C279.V']
-  I                  =  []
-  Q                  =  []
-  U                  =  []
-  V                   =  []
-  RM                 =  []
-  spec_index         =  []
-  RAoffset           =  []
-  Decoffset          =  []
+  model_image        =  []
+  I                  =  [1.0]
+  Q                  =  [0.0]
+  U                  =  [0.0]
+  V                  =  [0.0]
+  RM                 =  [0.0]
+  spec_index         =  [0.0]
+  RAoffset           =  [0.0]
+  Decoffset          =  [0.0]
   spectrum_file      =  ""
-  phase_center           =  "J2000 12h56m11.166567 -05d47m21.52481"
+  phase_center       =  "J2000 12h56m11.166567 -05d47m21.52481"
   incell             =  ""
   inbright           =  0.0
-  inwidth            =  "1GHz"
-  innu0              =  "228GHz"
+  inwidth            =  "50GHz"
+  innu0              =  "200GHz"
   H0                 =  -1.5
   onsource_time      =  1.0
   observe_time       =  3.0
   visib_time         =  "2s"
-  nscan              =  "../aips_3601_3C279.uvfits.listobs"
-  apply_parang       =  True 
-  export_uvf         =  False
-  corrupt            =  False
+  nscan              =  "3C279_3601_SELFCAL.ms.listobs"
+  apply_parang       =  True
+  export_uvf         =  True
+  corrupt            =  True
   seed               =  42
   Dt_amp             =  0.0
   Dt_noise           =  0.001
   tau0               =  0.02
   t_sky              =  250.0
   t_ground           =  270.0
-  t_receiver         =  25.0
+  t_receiver         =  100.0
 
 
 
@@ -145,6 +143,7 @@ def polsimulate(vis = 'polsimulate_output.ms', reuse = False, array_configuratio
 
 
 
+
 ##################################
 #### HELPER FUNCTIONS
 
@@ -165,6 +164,14 @@ def polsimulate(vis = 'polsimulate_output.ms', reuse = False, array_configuratio
 
 
 
+
+# Return GMST from UT time (from NRAO webpage):
+  def GMST(MJD):
+    Days = MJD/86400.  
+    t = (Days -51544.0)/36525.
+    Hh = (Days - np.floor(Days))
+    GMsec = 24110.54841 + 8640184.812866*t + 0.093104*t*t - 0.0000062*t*t*t
+    return (GMsec/86400. + Hh)*2.*np.pi
 
 
 
@@ -824,6 +831,7 @@ def polsimulate(vis = 'polsimulate_output.ms', reuse = False, array_configuratio
   csys = cs.newcoordsys(direction=True)
   csys.setdirection(refcode=dirst[0], refval=' '.join(dirst[1:]))
   Dec = csys.torecord()['direction0']['crval'][1]
+  RA = csys.torecord()['direction0']['crval'][0]
 
   CosDec = np.cos(Dec)
   SinDec = np.sin(Dec)
@@ -854,27 +862,30 @@ def polsimulate(vis = 'polsimulate_output.ms', reuse = False, array_configuratio
     Ndata = np.shape(temp['u'])[0]
     PAs[i].append(np.zeros((Ndata,2)))
     
-    V2 = SinDec*temp['v'] - CosDec*temp['w']
+#    V2 = SinDec*temp['v'] - CosDec*temp['w']
     
     
-    Bx = -(apos[0,temp['antenna2']]-apos[0,temp['antenna1']])
-    By = -(apos[1,temp['antenna2']]-apos[1,temp['antenna1']])
-    Bz = -(apos[2,temp['antenna2']]-apos[2,temp['antenna1']])
+#    Bx = -(apos[0,temp['antenna2']]-apos[0,temp['antenna1']])
+#    By = -(apos[1,temp['antenna2']]-apos[1,temp['antenna1']])
+#    Bz = -(apos[2,temp['antenna2']]-apos[2,temp['antenna1']])
 
-    CH = temp['u']*By - V2*Bx
-    SH = temp['u']*Bx + V2*By
+#    CH = temp['u']*By - V2*Bx
+#    SH = temp['u']*Bx + V2*By
 
 
     CT1 = CosDec*Tlat[temp['antenna1']]
     CT2 = CosDec*Tlat[temp['antenna2']]
     
-    HAng = np.arctan2(SH,CH)
+#    HAng = np.arctan2(SH,CH)
+    HAng = (GMST(temp['time']) - RA)%(2.*np.pi)
     
     H1 = HAng + Lon[temp['antenna1']]
     H2 = HAng + Lon[temp['antenna2']]
     
     
-    Autos = (CH==0.)*(SH==0.)
+  #  Autos = (CH==0.)*(SH==0.)
+    Autos = temp['antenna1']==temp['antenna2']
+
     H1[Autos] = 0.0
     H2[Autos] = 0.0
     
@@ -956,7 +967,8 @@ def polsimulate(vis = 'polsimulate_output.ms', reuse = False, array_configuratio
       Flags.append(np.copy(temp2['flag'][0,0,:]))      
 
 
-    del E1, E2, H1, H2, HAng, CT1, CT2, CH, SH, V2, Bx, By, Bz
+ #   del E1, E2, H1, H2, HAng, CT1, CT2, CH, SH, V2, Bx, By, Bz
+    del E1, E2, H1, H2, HAng, CT1, CT2
 
     ms.close()  
 #######################################
