@@ -81,33 +81,31 @@ import sys
 ms = gentools(['ms'])[0]
 tb = gentools(['tb'])[0]
 
-__version__ = '1.0'
+__version__ = '1.1b'
 
 
 #####################
 # UNIT TEST LINES:
 if __name__=='__main__':
 
-  vis                =  "PointSource_POLSIM_3601.ms"
+  vis                =  "3C279_3601_UVFIX2.ms"
   spw                =  0
   field              =  "0"
-  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'NL', 'AZ']
+  mounts             =  ['AZ', 'NR', 'NR', 'AZ', 'NL', 'NL', 'NL', 'AZ', 'NL']
+  feed_rotation      =  []
   DR                 =  []
   DL                 =  []
-  DRSolve            =  [True, True, True, True, True, True, True, True]
-  DLSolve            =  [True, True, True, True, True, True, True, True]
-  CLEAN_models       =  1.0
-  Pfrac              =  [0.0]
-  EVPA               =  [0.0]
-  PolSolve           =  [True]
+  DRSolve            =  [True, True, True, False, True, True, True, True, False]
+  DLSolve            =  [True, True, True, False, True, True, True, True, False]
+  CLEAN_models       =  ['3C279_3601_image.fits_CC00.dat', '3C279_3601_image.fits_CC01.dat']
+  Pfrac              =  [0.0, 0.0]
+  EVPA               =  [0.0, 0.0]
+  PolSolve           =  [True, True]
   parang_corrected    =  True
   target_field       =  ""
   plot_parang        =  True
   min_elev_plot      =  0.0
   wgt_power          =  1.0
-
-
-
 #
 #
 #
@@ -118,7 +116,7 @@ if __name__=='__main__':
 
 
 
-def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = [],
+def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = [], DR = [], DL = [],
                 DRSolve = [], DLSolve = [], CLEAN_models = [1.0], Pfrac = [0.0], 
                 EVPA = [0.0], PolSolve = [True], parang_corrected = True, target_field = '', plot_parang=False, min_elev_plot=10.0, wgt_power=1.0):
 
@@ -213,7 +211,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 # Helper function to compute feed (i.e., mount + parallactic) angles:
 
-  def getParangle(vis,spw,field,mounts, scan = -1,doplot=False):
+  def getParangle(vis,spw,field,mounts, feedAngles, scan = -1, doplot=False):
       
     """ Returns feed rotation (mount + parangle) for the visibilities
     corresponding to field (id) or to the scan number (if >= 0). """
@@ -309,6 +307,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
     for mti,mt in enumerate(mounts):
       filt = DATA['antenna1'] == mti 
+
       if mt=='AZ':
         PAs[filt,0] = -PAZ1[filt]
       elif mt=='EQ':
@@ -320,7 +319,10 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
       elif mt=='NL':
         PAs[filt,0] = -PAZ1[filt] + E1[filt]
 
+      PAs[filt,0] += feedAngles[mti]
+
       filt = DATA['antenna2'] == mti 
+      
       if mt=='AZ':
         PAs[filt,1] = -PAZ2[filt]
       elif mt=='EQ':
@@ -331,6 +333,8 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
         PAs[filt,1] = -PAZ2[filt] - E2[filt]
       elif mt=='NL':
         PAs[filt,1] = -PAZ2[filt] + E2[filt]
+
+      PAs[filt,1] += feedAngles[mti]
 
 # Release memory:
     if doplot:
@@ -358,9 +362,9 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     cols = a.shape[1]
     for i in range(0,rows):
       for j in range(0,cols):
-         print(f%a[i,j]),
+         print(f%a[i,j]) 
       print
-    print   
+    print
 
 
 
@@ -590,6 +594,30 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
+# Feed angles:
+
+  FeedAngles = np.zeros(nant)
+
+  try:
+    feed_rotation = list(feed_rotation)
+
+  except:
+    printError('ERROR: feed_rotation should be a list of floats!')
+   
+   
+  if len(feed_rotation) not in [0,nant]:
+    printError('ERROR: feed_rotation should have %i elements!'%nant)
+
+  for it in range(len(feed_rotation)):
+    try:  
+      FeedAngles[it] = np.pi/180.*float(feed_rotation[it]) 
+    except:
+      printError('ERROR: bad feed rotation for antenna #%i!'%it)
+
+
+
+
+    
 
 # Print info for sanity checking:
   printMsg('\nThere are %i antennas'%nant)
@@ -607,6 +635,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 # More sanity checks:
   for pi in polprods: # By now, only circular feeds are allowed.
     if pi not in ['RR','RL','LR','LL']:
+      ms.close()  
       printError("ERROR! Wrong pol. product %s"%pi)
 
   if len(polprods) != 4:
@@ -616,6 +645,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 # Load data:
   ms.selectinit(datadescid=int(spw))
   if not ms.select({'field_id':fid}):
+    ms.close()
     printError('Problem reading data for source #%i'%fid)
 
   DATA = ms.getdata(['u','v','w','antenna1','antenna2','data','weight','flag'])
@@ -661,6 +691,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
 
 
+
 ######################################
 # Computing parallactic angles:
 
@@ -672,7 +703,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
     NMAX = 8  # Maximum number of antennas in the plot
     col = ['r','g','b','c','m','y','k','w'] # colors
 
-    PAs, TT, A1, A2, FG = getParangle(vis,spw,fid,mounts,doplot=True)
+    PAs, TT, A1, A2, FG = getParangle(vis,spw,fid,mounts,FeedAngles,doplot=True)
 
     MIN = PAs[:,0] < -np.pi
     PAs[MIN,0] += 2.*np.pi
@@ -729,9 +760,9 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
           TOPLOT = np.copy(-PAs[mask,1]*180./np.pi)
           PLOTTED = np.sum(mask)>0
 
-          for mi,m in enumerate(mask):
-            if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,1]*180./np.pi
+          #for mi,m in enumerate(mask):
+           # if m:  
+           #   print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,1]*180./np.pi
 
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
          
@@ -740,9 +771,9 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i])
 
-          for mi,m in enumerate(mask):
-            if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
+          #for mi,m in enumerate(mask):
+           # if m:  
+           #   print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
 
 
         else:
@@ -752,9 +783,9 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
           sub.plot( UT[mask], TOPLOT, 'o%s'%col[i], label=NAMES[i+NMAX*k])
 
 
-          for mi,m in enumerate(mask):
-            if m:  
-              print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
+          #for mi,m in enumerate(mask):
+          #  if m:  
+          #    print >> OFF,NAMES[i+NMAX*k],UT[mi], -PAs[mi,0]*180./np.pi
  
         pl.legend(numpoints=1)
         
@@ -770,7 +801,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
   
   else:
  
-    PAs = getParangle(vis,spw,fid,mounts)
+    PAs = getParangle(vis,spw,fid,mounts,FeedAngles)
   
 
 
@@ -778,13 +809,6 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
 
   gc.collect()
   
-
-
-#    DATAPol[:,:,0] *= EMA[:,np.newaxis]
-#    DATAPol[:,:,1] /= EMA[:,np.newaxis]
-#    DATAPol[:,:,2] *= EPA[:,np.newaxis]
-#    DATAPol[:,:,3] /= EPA[:,np.newaxis]
-
 
 
 ################
@@ -823,6 +847,19 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], DR = [], DL = []
  
 
 
+####################
+##### CODE FOR TESTING (WRITE MODEL INTO MS):
+#  ms.open(vis,nomodify=False)
+#  ms.selectinit(datadescid=int(spw))
+#  ms.select({'field_id':fid})
+#  MDATA = ms.getdata(['data','corrected_data','model_data'])
+#  MDATA['model_data'][0,0,:] = COMPS[:,0,NmodComp]
+#  MDATA['corrected_data'][0,:,:] = MDATA['data'][0,:,:]/MDATA['model_data'][0,:,:]
+#  ms.putdata(MDATA)
+#  ms.close()
+#  del MDATA['model_data'],MDATA['data'],MDATA['corrected_data']
+#  del MDATA
+####################
 
 
 

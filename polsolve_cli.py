@@ -27,7 +27,7 @@ class polsolve_cli_:
        self.__bases__ = (polsolve_cli_,)
        self.__doc__ = self.__call__.__doc__
 
-       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, 'target_field':None, 'plot_parang':None, 'min_elev_plot':None, 'wgt_power':None, }
+       self.parameters={'vis':None, 'spw':None, 'field':None, 'mounts':None, 'feed_rotation':None, 'DR':None, 'DL':None, 'DRSolve':None, 'DLSolve':None, 'CLEAN_models':None, 'Pfrac':None, 'EVPA':None, 'PolSolve':None, 'parang_corrected':None, 'target_field':None, 'plot_parang':None, 'min_elev_plot':None, 'wgt_power':None, }
 
 
     def result(self, key=None):
@@ -35,7 +35,7 @@ class polsolve_cli_:
 	    return None
 
 
-    def __call__(self, vis=None, spw=None, field=None, mounts=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, target_field=None, plot_parang=None, min_elev_plot=None, wgt_power=None, ):
+    def __call__(self, vis=None, spw=None, field=None, mounts=None, feed_rotation=None, DR=None, DL=None, DRSolve=None, DLSolve=None, CLEAN_models=None, Pfrac=None, EVPA=None, PolSolve=None, parang_corrected=None, target_field=None, plot_parang=None, min_elev_plot=None, wgt_power=None, ):
 
         """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 
@@ -52,6 +52,9 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
 		   Default Value: 0
 
 		mounts:	List of the antenna mounts (must be given\n in the same order as the ANTENNA table \nof the ms). Use this in case the mounts \nwere not properly imported into the ms.\nA mount type is specified with two characters.\nSupported mounts: \nalt-az (\'AZ\'), \nequatorial (\'EQ\'), \nX-Y (\'XY\'), \nNasmyth Right (\'NR\') and \nNasmyth Left (\'NL\'). \nDefault means all antennas are alt-az.
+		   Default Value: []
+
+		feed_rotation:	Rotation of the feed of each antenna with respect to the local horizontal-vertical frame. One value per antenna. Empty list assumes a null feed angle for all antennas.
 		   Default Value: []
 
 		DR:	List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DR leakage terms to use \n in the fit.
@@ -198,6 +201,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
             myparams['spw'] = spw = self.parameters['spw']
             myparams['field'] = field = self.parameters['field']
             myparams['mounts'] = mounts = self.parameters['mounts']
+            myparams['feed_rotation'] = feed_rotation = self.parameters['feed_rotation']
             myparams['DR'] = DR = self.parameters['DR']
             myparams['DL'] = DL = self.parameters['DL']
             myparams['DRSolve'] = DRSolve = self.parameters['DRSolve']
@@ -224,6 +228,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         mytmp['spw'] = spw
         mytmp['field'] = field
         mytmp['mounts'] = mounts
+        mytmp['feed_rotation'] = feed_rotation
         mytmp['DR'] = DR
         mytmp['DL'] = DL
         mytmp['DRSolve'] = DRSolve
@@ -262,7 +267,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
               casalog.post(scriptstr[0]+'\n', 'INFO')
           else :
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
-          result = polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
+          result = polsolve(vis, spw, field, mounts, feed_rotation, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
           if (casa['state']['telemetry-enabled']):
               casalog.poststat('End Task: ' + tname)
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
@@ -320,6 +325,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         a['spw']  = 0
         a['field']  = '0'
         a['mounts']  = []
+        a['feed_rotation']  = []
         a['DR']  = []
         a['DL']  = []
         a['DRSolve']  = []
@@ -406,6 +412,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
                'spw': 'Spectral window to fit for.',
                'field': 'Field name (or id) to use as calibrator.',
                'mounts': 'List of the antenna mounts (must be given\n in the same order as the ANTENNA table \nof the ms). Use this in case the mounts \nwere not properly imported into the ms.\nA mount type is specified with two characters.\nSupported mounts: \nalt-az (\'AZ\'), \nequatorial (\'EQ\'), \nX-Y (\'XY\'), \nNasmyth Right (\'NR\') and \nNasmyth Left (\'NL\'). \nDefault means all antennas are alt-az.',
+               'feed_rotation': 'Rotation of the feed of each antenna with respect to the local horizontal-vertical frame. One value per antenna. Empty list assumes a null feed angle for all antennas.',
                'DR': 'List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DR leakage terms to use \n in the fit.',
                'DL': 'List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DL leakage terms to use \n in the fit.',
                'DRSolve': 'List of booleans (length equal\nto the number of antennas). If not empty,\n it will tell which DR terms are fitted. \n The DR[i] term will be fitted if \n DRSolve[i] is True. Otherwise, DR[i] \n will be fixed to its a-priori value. \n Default (i.e., empty list) means \n to fit all DRs. ',
@@ -431,6 +438,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         a['spw']  = 0
         a['field']  = '0'
         a['mounts']  = []
+        a['feed_rotation']  = []
         a['DR']  = []
         a['DL']  = []
         a['DRSolve']  = []

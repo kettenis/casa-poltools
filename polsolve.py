@@ -11,7 +11,7 @@ from taskinit import casalog
 from taskinit import xmlpath
 #from taskmanager import tm
 import task_polsolve
-def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True, target_field='', plot_parang=False, min_elev_plot=10.0, wgt_power=1.0):
+def polsolve(vis='input.ms', spw=0, field='0', mounts=[], feed_rotation=[], DR=[], DL=[], DRSolve=[], DLSolve=[], CLEAN_models=[1.0], Pfrac=[0.0], EVPA=[0.0], PolSolve=[], parang_corrected=True, target_field='', plot_parang=False, min_elev_plot=10.0, wgt_power=1.0):
 
         """Version 1.0.1b - Leakage solver for circular polarizers and extended polarization calibrators.\n\n
 
@@ -71,6 +71,7 @@ def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=
         mytmp['spw'] = spw
         mytmp['field'] = field
         mytmp['mounts'] = mounts
+        mytmp['feed_rotation'] = feed_rotation
         mytmp['DR'] = DR
         mytmp['DL'] = DL
         mytmp['DRSolve'] = DRSolve
@@ -89,7 +90,7 @@ def polsolve(vis='input.ms', spw=0, field='0', mounts=[], DR=[], DL=[], DRSolve=
 
         casalog.origin('polsolve')
         if trec.has_key('polsolve') and casac.utils().verify(mytmp, trec['polsolve']) :
-	    result = task_polsolve.polsolve(vis, spw, field, mounts, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
+	    result = task_polsolve.polsolve(vis, spw, field, mounts, feed_rotation, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
 
 	else :
 	  result = False

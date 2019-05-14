@@ -35,7 +35,14 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
       <description>List of the antenna mounts (must be given\n in the same order as the ANTENNA table \nof the ms). Use this in case the mounts \nwere not properly imported into the ms.\nA mount type is specified with two characters.\nSupported mounts: \nalt-az (\'AZ\'), \nequatorial (\'EQ\'), \nX-Y (\'XY\'), \nNasmyth Right (\'NR\') and \nNasmyth Left (\'NL\'). \nDefault means all antennas are alt-az.</description>
       <value>[]</value>
     </param>
-    
+
+
+    <param type="any" name="feed_rotation" mustexist="false">
+      <description>Rotation of the feed of each antenna with respect to the local horizontal-vertical frame. One value per antenna. Empty list assumes a null feed angle for all antennas.</description>
+      <value>[]</value>
+    </param>
+
+
     <param type="any" name="DR" mustexist="false">
       <description>List of complex numbers (length equal\n to the number of antennas). If not empty, \n these are the a-priori values of \n the DR leakage terms to use \n in the fit.</description> 
       <value>[]</value>
