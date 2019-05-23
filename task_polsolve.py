@@ -439,6 +439,7 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
 
   GoodMounts = ['AZ','EQ','NR','NL','XY']
 
+  printMsg('WARNING! Currently, PolSolve only handles circular-feed receivers')
 
 # Currently, we only work with circular feeds:
   doCirc = True
@@ -854,7 +855,11 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
 #  ms.select({'field_id':fid})
 #  MDATA = ms.getdata(['data','corrected_data','model_data'])
 #  MDATA['model_data'][0,0,:] = COMPS[:,0,NmodComp]
-#  MDATA['corrected_data'][0,:,:] = MDATA['data'][0,:,:]/MDATA['model_data'][0,:,:]
+#  MDATA['model_data'][1,0,:] = COMPS[:,0,NmodComp]
+#  MDATA['model_data'][2,0,:] = COMPS[:,0,NmodComp]
+#  MDATA['model_data'][3,0,:] = COMPS[:,0,NmodComp]
+#
+#  MDATA['corrected_data'][:,:,:] = MDATA['data'] - MDATA['model_data']
 #  ms.putdata(MDATA)
 #  ms.close()
 #  del MDATA['model_data'],MDATA['data'],MDATA['corrected_data']
@@ -1271,15 +1276,15 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
   targets = str(target_field)
   if len(targets)>0:
     selFields = getFields(vis,targets)
-    if not parang_corrected:
-      printError('IN THE CURRENT VERSION, DTERMS ARE ONLY APPLIED IF parang_corrected is True!')
+  #  if not parang_corrected:
+  #    printError('IN THE CURRENT VERSION, DTERMS ARE ONLY APPLIED IF parang_corrected is True!')
   else:
     selFields = []
   
   
-  DRa = -np.array(DR)
-  DLa = -np.array(DL)
-  SFac = np.abs(1./(1.-DRa*DLa))    
+  DRa = -np.array(DR,dtype=np.complex128)
+  DLa = -np.array(DL,dtype=np.complex128)
+  SFac = 1./(1.-DRa*DLa)    
       
   for target in selFields:
     printMsg('\nApplying calibration to field id %i'%target)  
@@ -1291,14 +1296,13 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
       sys.stdout.write('\r  SCAN %i'%sci)
       sys.stdout.flush()
       
-      PAs = getParangle(vis,spw,target,mounts, scan=sci)
+      PAs = getParangle(vis,spw,target,mounts, FeedAngles, scan=sci)
         
       ms.open(vis,nomodify=False)
       ms.selectinit(datadescid=spw)
       ms.select({'scan_number':sci})
       try:
-        DATA = ms.getdata(['corrected_data'])
-        ANTD = ms.getdata(['antenna1','antenna2'])
+        DATA = ms.getdata(['data','corrected_data','antenna1','antenna2'])
       except:
         ms.close()
         printError('COULD NOT READ CORRECTED DATA! DID YOU RUN CLEARCAL??')
@@ -1306,42 +1310,42 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
 
 
 # Sum and difference of PANGS (in complex form):
-    EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
+      EPA = np.exp(1.j*(PAs[:,0]+PAs[:,1])) ; EMA = np.exp(1.j*(PAs[:,0]-PAs[:,1]))
 
 
 # Get data back into antenna frame:
-    if parang_corrected:
-      DATA['corrected_data'][polprods.index('RR'),:,:] *= EMA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('RL'),:,:] *= EPA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('LR'),:,:] /= EPA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('LL'),:,:] /= EMA[np.newaxis,:]
+      if parang_corrected:
+        DATA['corrected_data'][polprods.index('RR'),:,:] = DATA['data'][polprods.index('RR'),:,:]*EMA[np.newaxis,:]
+        DATA['corrected_data'][polprods.index('RL'),:,:] = DATA['data'][polprods.index('RL'),:,:]*EPA[np.newaxis,:]
+        DATA['corrected_data'][polprods.index('LR'),:,:] = DATA['data'][polprods.index('LR'),:,:]/EPA[np.newaxis,:]
+        DATA['corrected_data'][polprods.index('LL'),:,:] = DATA['data'][polprods.index('LL'),:,:]/EMA[np.newaxis,:]
 
 # Apply Dterms:
-    SDt = SFac[ANTD['antenna1']]*np.conjugate(SFac[ANTD['antenna2']])
-    BKP_RR = np.copy(DATA['corrected_data'][polprods.index('RR'),:,:])*SDt
-    BKP_RL = np.copy(DATA['corrected_data'][polprods.index('RL'),:,:])*SDt
-    BKP_LR = np.copy(DATA['corrected_data'][polprods.index('LR'),:,:])*SDt
-    BKP_LL = np.copy(DATA['corrected_data'][polprods.index('LL'),:,:])*SDt
+      SDt = SFac[DATA['antenna1']]*np.conjugate(SFac[DATA['antenna2']])
+      BKP_RR = np.copy(DATA['corrected_data'][polprods.index('RR'),:,:])*SDt
+      BKP_RL = np.copy(DATA['corrected_data'][polprods.index('RL'),:,:])*SDt
+      BKP_LR = np.copy(DATA['corrected_data'][polprods.index('LR'),:,:])*SDt
+      BKP_LL = np.copy(DATA['corrected_data'][polprods.index('LL'),:,:])*SDt
 
-    DATA['corrected_data'][polprods.index('RR'),:,:] = BKP_RR + np.conjugate(DRa[ANTD['antenna2']])*BKP_RL + DRa[ANTD['antenna1']]*BKP_LR + DRa[ANTD['antenna1']]*np.conjugate(DRa[ANTD['antenna2']])*BKP_LL
-    DATA['corrected_data'][polprods.index('RL'),:,:] = BKP_RL + DRa[ANTD['antenna1']]*np.conjugate(DLa[ANTD['antenna2']])*BKP_LR + DRa[ANTD['antenna1']]*BKP_LL + np.conjugate(DLa[ANTD['antenna2']])*BKP_RR
-    DATA['corrected_data'][polprods.index('LR'),:,:] = BKP_LR + DLa[ANTD['antenna1']]*np.conjugate(DRa[ANTD['antenna2']])*BKP_RL + DLa[ANTD['antenna1']]*BKP_RR + np.conjugate(DRa[ANTD['antenna2']])*BKP_LL
-    DATA['corrected_data'][polprods.index('LL'),:,:] = BKP_LL + np.conjugate(DLa[ANTD['antenna2']])*BKP_LR + DLa[ANTD['antenna1']]*BKP_RL + DLa[ANTD['antenna1']]*np.conjugate(DLa[ANTD['antenna2']])*BKP_RR
+      DATA['corrected_data'][polprods.index('RR'),:,:] = BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DRa[DATA['antenna1']]*BKP_LR + DRa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_LL
+      DATA['corrected_data'][polprods.index('RL'),:,:] = BKP_RL + DRa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DRa[DATA['antenna1']]*BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_RR
+      DATA['corrected_data'][polprods.index('LR'),:,:] = BKP_LR + DLa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DLa[DATA['antenna1']]*BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_LL
+      DATA['corrected_data'][polprods.index('LL'),:,:] = BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DLa[DATA['antenna1']]*BKP_RL + DLa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_RR
 
 # Put data into sky frame:
-    DATA['corrected_data'][polprods.index('RR'),:,:] /= EMA[np.newaxis,:]
-    DATA['corrected_data'][polprods.index('RL'),:,:] /= EPA[np.newaxis,:]
-    DATA['corrected_data'][polprods.index('LR'),:,:] *= EPA[np.newaxis,:]
-    DATA['corrected_data'][polprods.index('LL'),:,:] *= EMA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('RR'),:,:] /= EMA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('RL'),:,:] /= EPA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('LR'),:,:] *= EPA[np.newaxis,:]
+      DATA['corrected_data'][polprods.index('LL'),:,:] *= EMA[np.newaxis,:]
 
 # Save data:
-    ms.putdata(DATA)
-    ms.close()
+      ms.putdata(DATA)
+      ms.close()
    
 
 # Release memory:
-    del BKP_RR, BKP_LL, BKP_RL, BKP_LR, DATA['corrected_data'], ANTD['antenna1'], ANTD['antenna2'], SDt
-    gc.collect()
+      del BKP_RR, BKP_LL, BKP_RL, BKP_LR, DATA['corrected_data'], DATA['antenna1'], DATA['antenna2'], SDt
+      gc.collect()
     
 
 if __name__=='__main__':
