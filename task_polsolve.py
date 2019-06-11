@@ -1302,7 +1302,8 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
       ms.selectinit(datadescid=spw)
       ms.select({'scan_number':sci})
       try:
-        DATA = ms.getdata(['data','corrected_data','antenna1','antenna2'])
+        DATA = ms.getdata(['data','antenna1','antenna2'])
+        DATA2 = ms.getdata(['corrected_data'])
       except:
         ms.close()
         printError('COULD NOT READ CORRECTED DATA! DID YOU RUN CLEARCAL??')
@@ -1315,36 +1316,36 @@ def polsolve(vis = 'input.ms', spw=0, field = '0', mounts = [], feed_rotation = 
 
 # Get data back into antenna frame:
       if parang_corrected:
-        DATA['corrected_data'][polprods.index('RR'),:,:] = DATA['data'][polprods.index('RR'),:,:]*EMA[np.newaxis,:]
-        DATA['corrected_data'][polprods.index('RL'),:,:] = DATA['data'][polprods.index('RL'),:,:]*EPA[np.newaxis,:]
-        DATA['corrected_data'][polprods.index('LR'),:,:] = DATA['data'][polprods.index('LR'),:,:]/EPA[np.newaxis,:]
-        DATA['corrected_data'][polprods.index('LL'),:,:] = DATA['data'][polprods.index('LL'),:,:]/EMA[np.newaxis,:]
+        DATA2['corrected_data'][polprods.index('RR'),:,:] = DATA['data'][polprods.index('RR'),:,:]*EMA[np.newaxis,:]
+        DATA2['corrected_data'][polprods.index('RL'),:,:] = DATA['data'][polprods.index('RL'),:,:]*EPA[np.newaxis,:]
+        DATA2['corrected_data'][polprods.index('LR'),:,:] = DATA['data'][polprods.index('LR'),:,:]/EPA[np.newaxis,:]
+        DATA2['corrected_data'][polprods.index('LL'),:,:] = DATA['data'][polprods.index('LL'),:,:]/EMA[np.newaxis,:]
 
 # Apply Dterms:
       SDt = SFac[DATA['antenna1']]*np.conjugate(SFac[DATA['antenna2']])
-      BKP_RR = np.copy(DATA['corrected_data'][polprods.index('RR'),:,:])*SDt
-      BKP_RL = np.copy(DATA['corrected_data'][polprods.index('RL'),:,:])*SDt
-      BKP_LR = np.copy(DATA['corrected_data'][polprods.index('LR'),:,:])*SDt
-      BKP_LL = np.copy(DATA['corrected_data'][polprods.index('LL'),:,:])*SDt
+      BKP_RR = np.copy(DATA2['corrected_data'][polprods.index('RR'),:,:])*SDt
+      BKP_RL = np.copy(DATA2['corrected_data'][polprods.index('RL'),:,:])*SDt
+      BKP_LR = np.copy(DATA2['corrected_data'][polprods.index('LR'),:,:])*SDt
+      BKP_LL = np.copy(DATA2['corrected_data'][polprods.index('LL'),:,:])*SDt
 
-      DATA['corrected_data'][polprods.index('RR'),:,:] = BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DRa[DATA['antenna1']]*BKP_LR + DRa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_LL
-      DATA['corrected_data'][polprods.index('RL'),:,:] = BKP_RL + DRa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DRa[DATA['antenna1']]*BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_RR
-      DATA['corrected_data'][polprods.index('LR'),:,:] = BKP_LR + DLa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DLa[DATA['antenna1']]*BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_LL
-      DATA['corrected_data'][polprods.index('LL'),:,:] = BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DLa[DATA['antenna1']]*BKP_RL + DLa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_RR
+      DATA2['corrected_data'][polprods.index('RR'),:,:] = BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DRa[DATA['antenna1']]*BKP_LR + DRa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_LL
+      DATA2['corrected_data'][polprods.index('RL'),:,:] = BKP_RL + DRa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DRa[DATA['antenna1']]*BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_RR
+      DATA2['corrected_data'][polprods.index('LR'),:,:] = BKP_LR + DLa[DATA['antenna1']]*np.conjugate(DRa[DATA['antenna2']])*BKP_RL + DLa[DATA['antenna1']]*BKP_RR + np.conjugate(DRa[DATA['antenna2']])*BKP_LL
+      DATA2['corrected_data'][polprods.index('LL'),:,:] = BKP_LL + np.conjugate(DLa[DATA['antenna2']])*BKP_LR + DLa[DATA['antenna1']]*BKP_RL + DLa[DATA['antenna1']]*np.conjugate(DLa[DATA['antenna2']])*BKP_RR
 
 # Put data into sky frame:
-      DATA['corrected_data'][polprods.index('RR'),:,:] /= EMA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('RL'),:,:] /= EPA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('LR'),:,:] *= EPA[np.newaxis,:]
-      DATA['corrected_data'][polprods.index('LL'),:,:] *= EMA[np.newaxis,:]
+      DATA2['corrected_data'][polprods.index('RR'),:,:] /= EMA[np.newaxis,:]
+      DATA2['corrected_data'][polprods.index('RL'),:,:] /= EPA[np.newaxis,:]
+      DATA2['corrected_data'][polprods.index('LR'),:,:] *= EPA[np.newaxis,:]
+      DATA2['corrected_data'][polprods.index('LL'),:,:] *= EMA[np.newaxis,:]
 
 # Save data:
-      ms.putdata(DATA)
+      ms.putdata(DATA2)
       ms.close()
    
 
 # Release memory:
-      del BKP_RR, BKP_LL, BKP_RL, BKP_LR, DATA['corrected_data'], DATA['antenna1'], DATA['antenna2'], SDt
+      del BKP_RR, BKP_LL, BKP_RL, BKP_LR, DATA2['corrected_data'], DATA['antenna1'], DATA['antenna2'], SDt
       gc.collect()
     
 

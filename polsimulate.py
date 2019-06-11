@@ -167,7 +167,7 @@ def polsimulate(vis='polsimulate_output.ms', reuse=False, array_configuration='a
         mytmp['t_sky'] = t_sky
         mytmp['t_ground'] = t_ground
         mytmp['t_receiver'] = t_receiver
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
+	pathname="file:///home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools/"
 	trec = casac.utils().torecord(pathname+'polsimulate.xml')
 
         casalog.origin('polsimulate')

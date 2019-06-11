@@ -85,7 +85,7 @@ def polsolve(vis='input.ms', spw=0, field='0', mounts=[], feed_rotation=[], DR=[
         mytmp['plot_parang'] = plot_parang
         mytmp['min_elev_plot'] = min_elev_plot
         mytmp['wgt_power'] = wgt_power
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
+	pathname="file:///home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools/"
 	trec = casac.utils().torecord(pathname+'polsolve.xml')
 
         casalog.origin('polsolve')

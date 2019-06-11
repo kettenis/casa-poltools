@@ -5,12 +5,12 @@
 #
 import sys
 import os
+import datetime
 #from casac import *
 import casac
 import string
 import time
 import inspect
-import gc
 import numpy
 from casa_stack_manip import stack_frame_find
 from odict import odict
@@ -420,7 +420,7 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
         mytmp['t_sky'] = t_sky
         mytmp['t_ground'] = t_ground
         mytmp['t_receiver'] = t_receiver
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
+	pathname="file:///home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools/"
 	trec = casac.casac.utils().torecord(pathname+'polsimulate.xml')
 
         casalog.origin('polsimulate')
@@ -431,23 +431,34 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
           casac.casac.utils().verify(mytmp, trec['polsimulate'], True)
           scriptstr=['']
           saveinputs = self.__globals__['saveinputs']
+
+          # Save .last file for this task execution. MPI servers don't write it (CASR-329).
+          from mpi4casa.MPIEnvironment import MPIEnvironment
+          do_full_logging = MPIEnvironment.is_mpi_disabled_or_client()
           if type(self.__call__.func_defaults) is NoneType:
               saveinputs=''
           else:
-              saveinputs('polsimulate', 'polsimulate.last', myparams, self.__globals__,scriptstr=scriptstr)
+              saveinputs('polsimulate', 'polsimulate.last', myparams, self.__globals__,scriptstr=scriptstr, do_save_inputs=do_full_logging)
+
           tname = 'polsimulate'
           spaces = ' '*(18-len(tname))
           casalog.post('\n##########################################'+
                        '\n##### Begin Task: ' + tname + spaces + ' #####')
-          if (casa['state']['telemetry-enabled']):
-              casalog.poststat('Begin Task: ' + tname)
+          # Don't do telemetry from MPI servers (CASR-329)
+          if do_full_logging and casa['state']['telemetry-enabled']:
+              #casalog.poststat('Begin Task: ' + tname)
+              task_starttime = str(datetime.datetime.now())
           if type(self.__call__.func_defaults) is NoneType:
               casalog.post(scriptstr[0]+'\n', 'INFO')
-          else :
+          else:
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
+
+          # Effective call to the task as defined in gcwrap/python/scripts/task_*
           result = polsimulate(vis, reuse, array_configuration, elevation_cutoff, feed, mounts, ConstDt0, ConstDt1, LO, BBs, spw_width, nchan, model_image, I, Q, U, V, RM, spec_index, RAoffset, Decoffset, spectrum_file, phase_center, incell, inbright, inwidth, innu0, H0, onsource_time, observe_time, visib_time, nscan, apply_parang, export_uvf, corrupt, seed, Dt_amp, Dt_noise, tau0, t_sky, t_ground, t_receiver)
-          if (casa['state']['telemetry-enabled']):
-              casalog.poststat('End Task: ' + tname)
+
+          if do_full_logging and casa['state']['telemetry-enabled']:
+              task_endtime = str(datetime.datetime.now())
+              casalog.poststat( 'Task ' + tname + ' complete. Start time: ' + task_starttime + ' End time: ' + task_endtime )
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
                        '\n##########################################')
 
@@ -461,7 +472,6 @@ Version 1.3.2 - Basic simulator of ALMA/J-VLA (and VLBI) full-polarization obser
              pass
 	casalog.origin('')
 
-        gc.collect()
         return result
 #
 #

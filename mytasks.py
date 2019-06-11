@@ -6,8 +6,8 @@
 import sys
 from casa_stack_manip import stack_frame_find
 
-if sys.path[1] != '/data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk':
-  sys.path.insert(1, '/data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk')
+if sys.path[1] != '/home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools':
+  sys.path.insert(1, '/home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools')
 from odict import odict
 if not globals().has_key('mytasks') :
   mytasks = odict()
@@ -18,8 +18,8 @@ mytasks['polsolve'] = 'Version 1.0.1b - Leakage solver for circular polarizers a
 if not globals().has_key('task_location') :
   task_location = odict()
 
-task_location['polsimulate'] = '/data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk'
-task_location['polsolve'] = '/data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk'
+task_location['polsimulate'] = '/home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools'
+task_location['polsolve'] = '/home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools'
 myglobals = stack_frame_find( )
 tasksum = myglobals['tasksum'] 
 for key in mytasks.keys() :

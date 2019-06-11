@@ -5,12 +5,12 @@
 #
 import sys
 import os
+import datetime
 #from casac import *
 import casac
 import string
 import time
 import inspect
-import gc
 import numpy
 from casa_stack_manip import stack_frame_find
 from odict import odict
@@ -242,7 +242,7 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
         mytmp['plot_parang'] = plot_parang
         mytmp['min_elev_plot'] = min_elev_plot
         mytmp['wgt_power'] = wgt_power
-	pathname="file:///data/SHARED/WORKAREA/ARC_TOOLS/CASA-PolTools/trunk/"
+	pathname="file:///home/marti/WORKAREA/ARC_TOOLS/CASA-PolTools/casa-poltools/"
 	trec = casac.casac.utils().torecord(pathname+'polsolve.xml')
 
         casalog.origin('polsolve')
@@ -253,23 +253,34 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
           casac.casac.utils().verify(mytmp, trec['polsolve'], True)
           scriptstr=['']
           saveinputs = self.__globals__['saveinputs']
+
+          # Save .last file for this task execution. MPI servers don't write it (CASR-329).
+          from mpi4casa.MPIEnvironment import MPIEnvironment
+          do_full_logging = MPIEnvironment.is_mpi_disabled_or_client()
           if type(self.__call__.func_defaults) is NoneType:
               saveinputs=''
           else:
-              saveinputs('polsolve', 'polsolve.last', myparams, self.__globals__,scriptstr=scriptstr)
+              saveinputs('polsolve', 'polsolve.last', myparams, self.__globals__,scriptstr=scriptstr, do_save_inputs=do_full_logging)
+
           tname = 'polsolve'
           spaces = ' '*(18-len(tname))
           casalog.post('\n##########################################'+
                        '\n##### Begin Task: ' + tname + spaces + ' #####')
-          if (casa['state']['telemetry-enabled']):
-              casalog.poststat('Begin Task: ' + tname)
+          # Don't do telemetry from MPI servers (CASR-329)
+          if do_full_logging and casa['state']['telemetry-enabled']:
+              #casalog.poststat('Begin Task: ' + tname)
+              task_starttime = str(datetime.datetime.now())
           if type(self.__call__.func_defaults) is NoneType:
               casalog.post(scriptstr[0]+'\n', 'INFO')
-          else :
+          else:
               casalog.post(scriptstr[1][1:]+'\n', 'INFO')
+
+          # Effective call to the task as defined in gcwrap/python/scripts/task_*
           result = polsolve(vis, spw, field, mounts, feed_rotation, DR, DL, DRSolve, DLSolve, CLEAN_models, Pfrac, EVPA, PolSolve, parang_corrected, target_field, plot_parang, min_elev_plot, wgt_power)
-          if (casa['state']['telemetry-enabled']):
-              casalog.poststat('End Task: ' + tname)
+
+          if do_full_logging and casa['state']['telemetry-enabled']:
+              task_endtime = str(datetime.datetime.now())
+              casalog.poststat( 'Task ' + tname + ' complete. Start time: ' + task_starttime + ' End time: ' + task_endtime )
           casalog.post('##### End Task: ' + tname + '  ' + spaces + ' #####'+
                        '\n##########################################')
 
@@ -283,7 +294,6 @@ Version 1.0.1b - Leakage solver for circular polarizers and extended polarizatio
              pass
 	casalog.origin('')
 
-        gc.collect()
         return result
 #
 #
